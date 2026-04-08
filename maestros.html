@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pago de Maestros | Expressive English Academy Finances</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="maestros">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a href="index.html" class="brand-block">
+        <div class="brand-mark">EE</div>
+        <div>
+          <strong>Expressive English</strong>
+          <span>Academy Finances</span>
+        </div>
+      </a>
+
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-link">Inicio / Dashboard</a>
+        <a href="ingresos.html" class="nav-link">Ingresos</a>
+        <a href="gastos.html" class="nav-link">Gastos</a>
+        <a href="cuentas.html" class="nav-link">Cuentas</a>
+        <a href="maestros.html" class="nav-link active">Pago de maestros</a>
+        <a href="inversiones.html" class="nav-link">Inversiones</a>
+        <a href="reportes.html" class="nav-link">Reportes</a>
+      </nav>
+
+      <div class="sidebar-footer glass-card">
+        <span class="eyebrow">Cuenta por defecto</span>
+        <p>Los pagos a maestros se descuentan de la cuenta principal bancaria.</p>
+      </div>
+    </aside>
+
+    <div class="main-layout">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow">Nómina académica</span>
+          <h1>Pago de maestros</h1>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
+        </div>
+      </header>
+
+      <main class="content-grid">
+        <section class="two-column">
+          <article class="glass-card">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Nuevo pago</span>
+                <h2>Registrar pago a maestro</h2>
+              </div>
+            </div>
+
+            <form id="teacherForm" class="form-grid">
+              <label class="field">
+                <span>Nombre del maestro</span>
+                <input type="text" name="teacher" placeholder="María Fernanda López" required />
+              </label>
+
+              <label class="field">
+                <span>Fecha</span>
+                <input type="date" name="date" required />
+              </label>
+
+              <label class="field">
+                <span>Monto</span>
+                <input type="number" step="0.01" min="0" name="amount" required />
+              </label>
+
+              <label class="field">
+                <span>Período</span>
+                <input type="text" name="period" placeholder="Abril 2026" required />
+              </label>
+
+              <label class="field field-full">
+                <span>Notas</span>
+                <textarea name="notes" placeholder="Pago por clases del período"></textarea>
+              </label>
+
+              <button type="submit" class="btn btn-primary">Guardar pago</button>
+            </form>
+          </article>
+
+          <article class="glass-card">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Resumen por maestro</span>
+                <h2>Total pagado</h2>
+              </div>
+            </div>
+
+            <div id="teacherSummaryCards" class="stack-cards"></div>
+          </article>
+        </section>
+
+        <section class="glass-card">
+          <div class="panel-header">
+            <div>
+              <span class="eyebrow">Historial</span>
+              <h2>Pagos registrados</h2>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Maestro</th>
+                  <th>Fecha</th>
+                  <th>Monto</th>
+                  <th>Período</th>
+                  <th>Notas</th>
+                </tr>
+              </thead>
+              <tbody id="teacherTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
