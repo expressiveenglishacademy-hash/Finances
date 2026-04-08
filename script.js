@@ -123,12 +123,28 @@ function seedStorage() {
           currency: item.currency || "USD",
           exchangeRate: item.exchangeRate || 1,
           originalAmount: item.originalAmount ?? item.amount,
-          receiptLevel: item.receiptLevel || item.level || ""
+          receiptLevel: item.receiptLevel || item.level || "",
+          createdAt: item.createdAt || toIsoFromDateOnly(item.date)
         }))
       : [],
-    expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
-    teacherPayments: Array.isArray(parsed.teacherPayments) ? parsed.teacherPayments : [],
-    investments: Array.isArray(parsed.investments) ? parsed.investments : []
+    expenses: Array.isArray(parsed.expenses)
+      ? parsed.expenses.map((item) => ({
+          ...item,
+          createdAt: item.createdAt || toIsoFromDateOnly(item.date)
+        }))
+      : [],
+    teacherPayments: Array.isArray(parsed.teacherPayments)
+      ? parsed.teacherPayments.map((item) => ({
+          ...item,
+          createdAt: item.createdAt || toIsoFromDateOnly(item.date)
+        }))
+      : [],
+    investments: Array.isArray(parsed.investments)
+      ? parsed.investments.map((item) => ({
+          ...item,
+          createdAt: item.createdAt || toIsoFromDateOnly(item.date)
+        }))
+      : []
   };
 
   saveData(merged);
@@ -204,7 +220,7 @@ function renderDashboard(data) {
   setText("dashboardStudentsPending", String(studentStats.pending));
   setText("dashboardStudentsLate", String(studentStats.late));
 
-  const recent = buildRecentMovements(data).slice(0, 8);
+  const recent = buildRecentMovementsWithRunningBalance(data).slice(0, 8);
   const movementContainer = document.getElementById("recentMovements");
 
   const recentIncome = recent
@@ -227,7 +243,8 @@ function renderDashboard(data) {
         <div class="movement-item">
           <div class="movement-meta">
             <strong>${item.title}</strong>
-            <small>${item.dateLabel} · ${item.subtitle}</small>
+            <small>${item.dateLabel} · ${item.timeLabel} · ${item.subtitle}</small>
+            <small>Nuevo balance: ${formatCurrency(item.balanceAfter)}</small>
           </div>
           <div class="${item.positive ? "amount-positive" : "amount-negative"}">
             ${item.positive ? "+" : "-"}${formatCurrency(item.amount)}
@@ -369,6 +386,7 @@ function renderIncomesPage(data) {
       const payload = {
         id: cryptoRandom(),
         date: form.elements["date"].value,
+        createdAt: new Date().toISOString(),
         student: form.elements["student"].value.trim(),
         level: form.elements["level"].value.trim(),
         receiptLevel: form.elements["level"].value.trim(),
@@ -455,8 +473,9 @@ function renderPaymentHistoryPage(data) {
     }
 
     items.sort((a, b) => {
-      if (order === "asc") return new Date(a.date) - new Date(b.date);
-      return new Date(b.date) - new Date(a.date);
+      const aTime = new Date(a.createdAt || toIsoFromDateOnly(a.date));
+      const bTime = new Date(b.createdAt || toIsoFromDateOnly(b.date));
+      return order === "asc" ? aTime - bTime : bTime - aTime;
     });
 
     if (tableBody) {
@@ -816,6 +835,7 @@ function renderExpensesPage(data) {
       const payload = {
         id: cryptoRandom(),
         date: form.elements["date"].value,
+        createdAt: new Date().toISOString(),
         description: form.elements["description"].value.trim(),
         category: form.elements["category"].value,
         amount: Number(form.elements["amount"].value),
@@ -945,6 +965,7 @@ function renderTeachersPage(data) {
         id: cryptoRandom(),
         teacher: form.elements["teacher"].value.trim(),
         date: form.elements["date"].value,
+        createdAt: new Date().toISOString(),
         amount: Number(form.elements["amount"].value),
         period: form.elements["period"].value.trim(),
         notes: form.elements["notes"].value.trim()
@@ -1008,6 +1029,7 @@ function renderInvestmentsPage(data) {
       const payload = {
         id: cryptoRandom(),
         date: form.elements["date"].value,
+        createdAt: new Date().toISOString(),
         concept: form.elements["concept"].value.trim(),
         category: form.elements["category"].value,
         amount: Number(form.elements["amount"].value),
@@ -1264,41 +1286,70 @@ function syncIncomeToStudent(data, income) {
   }
 }
 
-function buildRecentMovements(data) {
+function buildRecentMovementsWithRunningBalance(data) {
+  const initialBalance = data.accounts.reduce(
+    (sum, account) => sum + Number(account.initialBalance || 0),
+    0
+  );
+
   const entries = [
     ...data.incomes.map((item) => ({
+      type: "income",
       title: item.student,
       subtitle: `${item.concept} · ${item.account}`,
-      amount: item.amount,
+      amount: Number(item.amount || 0),
       date: item.date,
+      createdAt: item.createdAt || toIsoFromDateOnly(item.date),
       positive: true
     })),
     ...data.expenses.map((item) => ({
+      type: "expense",
       title: item.description,
       subtitle: `Gasto · ${item.category} · ${item.account}`,
-      amount: item.amount,
+      amount: Number(item.amount || 0),
       date: item.date,
+      createdAt: item.createdAt || toIsoFromDateOnly(item.date),
       positive: false
     })),
     ...data.teacherPayments.map((item) => ({
+      type: "teacher",
       title: item.teacher,
       subtitle: `Pago a maestro · ${item.period}`,
-      amount: item.amount,
+      amount: Number(item.amount || 0),
       date: item.date,
+      createdAt: item.createdAt || toIsoFromDateOnly(item.date),
       positive: false
     })),
     ...data.investments.map((item) => ({
+      type: "investment",
       title: item.concept,
       subtitle: `Inversión · ${item.category} · ${item.account}`,
-      amount: item.amount,
+      amount: Number(item.amount || 0),
       date: item.date,
+      createdAt: item.createdAt || toIsoFromDateOnly(item.date),
       positive: false
     }))
   ];
 
-  return entries
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .map((item) => ({ ...item, dateLabel: formatDate(item.date) }));
+  const chronological = entries.sort((a, b) => {
+    const aTime = new Date(a.createdAt);
+    const bTime = new Date(b.createdAt);
+    return aTime - bTime;
+  });
+
+  let runningBalance = initialBalance;
+
+  const withBalance = chronological.map((item) => {
+    runningBalance += item.positive ? item.amount : -item.amount;
+    return {
+      ...item,
+      balanceAfter: runningBalance,
+      dateLabel: formatDate(item.date),
+      timeLabel: formatTime(item.createdAt)
+    };
+  });
+
+  return withBalance.reverse();
 }
 
 function buildCategoryReport(data) {
@@ -1454,6 +1505,14 @@ function formatDate(dateString) {
   });
 }
 
+function formatTime(isoString) {
+  if (!isoString) return "--:--";
+  return new Date(isoString).toLocaleTimeString("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
 function formatDueDate(date) {
   if (!date) return "-";
   return date.toLocaleDateString("es-MX", {
@@ -1481,6 +1540,11 @@ function todayValue() {
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+function toIsoFromDateOnly(dateString) {
+  if (!dateString) return new Date().toISOString();
+  return `${dateString}T12:00:00.000Z`;
 }
 
 function isSameMonth(dateString, month, year) {
