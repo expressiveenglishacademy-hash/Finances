@@ -19,6 +19,7 @@
 
       <nav class="sidebar-nav">
         <a href="index.html" class="nav-link active">Inicio / Dashboard</a>
+        <a href="estudiantes.html" class="nav-link">Estudiantes</a>
         <a href="ingresos.html" class="nav-link">Ingresos</a>
         <a href="gastos.html" class="nav-link">Gastos</a>
         <a href="cuentas.html" class="nav-link">Cuentas</a>
@@ -41,22 +42,21 @@
           <h1>Dashboard financiero</h1>
         </div>
 
-    <div class="topbar-actions">
-  <span class="status-pill">Modo oscuro activo</span>
-  <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
-  <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
-</div>
-
+        <div class="topbar-actions">
+          <span class="status-pill">Modo oscuro activo</span>
+          <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
+          <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
+        </div>
       </header>
 
       <main class="content-grid">
         <section class="hero-panel glass-card">
           <div>
             <span class="eyebrow">Vista principal</span>
-            <h2>Control diario con foco en caja, balance y movimientos</h2>
+            <h2>Control diario con foco en caja, balance y actividad estudiantil</h2>
             <p>
-              Supervisa el desempeño financiero de la academia en una vista clara,
-              moderna y lista para uso personal.
+              Supervisa ingresos, egresos, pagos pendientes y el flujo general de
+              la academia en una vista clara, moderna y lista para uso diario.
             </p>
           </div>
           <div class="hero-badge">
@@ -70,7 +70,7 @@
           <article class="metric-card glass-card">
             <span class="eyebrow">Ingresos del mes</span>
             <h3 id="metricIngresosMes">$0</h3>
-            <p>Mensualidades registradas en el período actual.</p>
+            <p>Mensualidades y pagos registrados en el período actual.</p>
           </article>
 
           <article class="metric-card glass-card">
@@ -92,6 +92,32 @@
           </article>
         </section>
 
+        <section class="metrics-grid">
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Estudiantes activos</span>
+            <h3 id="dashboardStudentsActive">0</h3>
+            <p>Total de alumnos activos registrados.</p>
+          </article>
+
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Al día</span>
+            <h3 id="dashboardStudentsOnTime">0</h3>
+            <p>Han cubierto la mensualidad actual.</p>
+          </article>
+
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Pendientes</span>
+            <h3 id="dashboardStudentsPending">0</h3>
+            <p>Todavía dentro del plazo de pago.</p>
+          </article>
+
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Retrasados</span>
+            <h3 id="dashboardStudentsLate">0</h3>
+            <p>Requieren seguimiento por vencimiento.</p>
+          </article>
+        </section>
+
         <section class="two-column">
           <article class="glass-card">
             <div class="panel-header">
@@ -107,12 +133,12 @@
           <article class="glass-card">
             <div class="panel-header">
               <div>
-                <span class="eyebrow">Cuentas</span>
-                <h2>Resumen rápido</h2>
+                <span class="eyebrow">Seguimiento estudiantil</span>
+                <h2>Pagos por atender</h2>
               </div>
-              <a href="cuentas.html" class="text-link">Administrar</a>
+              <a href="estudiantes.html" class="text-link">Abrir módulo</a>
             </div>
-            <div id="accountsSummary" class="account-mini-list"></div>
+            <div id="studentsAlerts" class="stack-cards"></div>
           </article>
         </section>
 
@@ -125,6 +151,10 @@
           </div>
 
           <div class="quick-links-grid">
+            <a class="quick-link-card" href="estudiantes.html">
+              <strong>Estudiantes</strong>
+              <span>Registra alumnos activos y controla retrasos.</span>
+            </a>
             <a class="quick-link-card" href="ingresos.html">
               <strong>Ingresos</strong>
               <span>Registrar mensualidades y pagos recibidos.</span>
@@ -136,10 +166,6 @@
             <a class="quick-link-card" href="maestros.html">
               <strong>Pago de maestros</strong>
               <span>Monitorear historial y resumen por docente.</span>
-            </a>
-            <a class="quick-link-card" href="inversiones.html">
-              <strong>Inversiones</strong>
-              <span>Registrar mejoras y crecimiento del proyecto.</span>
             </a>
           </div>
         </section>
