@@ -19,6 +19,7 @@
 
       <nav class="sidebar-nav">
         <a href="index.html" class="nav-link">Inicio / Dashboard</a>
+        <a href="estudiantes.html" class="nav-link">Estudiantes</a>
         <a href="ingresos.html" class="nav-link">Ingresos</a>
         <a href="gastos.html" class="nav-link">Gastos</a>
         <a href="cuentas.html" class="nav-link">Cuentas</a>
@@ -66,6 +67,25 @@
           </article>
         </section>
 
+        <section class="metrics-grid">
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Estudiantes activos</span>
+            <h3 id="reportStudentsActive">0</h3>
+          </article>
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Al día</span>
+            <h3 id="reportStudentsOnTime">0</h3>
+          </article>
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Pendientes</span>
+            <h3 id="reportStudentsPending">0</h3>
+          </article>
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Retrasados</span>
+            <h3 id="reportStudentsLate">0</h3>
+          </article>
+        </section>
+
         <section class="two-column">
           <article class="glass-card">
             <div class="panel-header">
@@ -92,11 +112,11 @@
           <article class="glass-card">
             <div class="panel-header">
               <div>
-                <span class="eyebrow">Comparativa</span>
-                <h2>Ingresos vs egresos</h2>
+                <span class="eyebrow">Seguimiento</span>
+                <h2>Estado de estudiantes</h2>
               </div>
             </div>
-            <div id="comparisonBars" class="comparison-bars"></div>
+            <div id="studentStatusCards" class="stack-cards"></div>
           </article>
 
           <article class="glass-card">
