@@ -1,10 +1,11 @@
-const STORAGE_KEY = "eea_finances_demo_v2";
+const STORAGE_KEY = "eea_finances_app_v4";
 const SESSION_KEY = "eea_finances_session";
 
 document.addEventListener("DOMContentLoaded", () => {
   seedStorage();
 
   const page = document.body.dataset.page || "";
+
   bindLogout();
   bindResetButtons();
 
@@ -92,33 +93,44 @@ function createEmptyData() {
 }
 
 function seedStorage() {
-  if (!localStorage.getItem(STORAGE_KEY)) {
+  const current = localStorage.getItem(STORAGE_KEY);
+  if (!current) {
     saveData(createEmptyData());
-  } else {
-    const current = getData();
-    const migrated = migrateData(current);
-    saveData(migrated);
+    return;
   }
+
+  const parsed = JSON.parse(current);
+  const base = createEmptyData();
+
+  const merged = {
+    incomeCategories: Array.isArray(parsed.incomeCategories) ? parsed.incomeCategories : base.incomeCategories,
+    expenseCategories: Array.isArray(parsed.expenseCategories) ? parsed.expenseCategories : base.expenseCategories,
+    investmentCategories: Array.isArray(parsed.investmentCategories) ? parsed.investmentCategories : base.investmentCategories,
+    accounts: Array.isArray(parsed.accounts) && parsed.accounts.length ? parsed.accounts : base.accounts,
+    students: Array.isArray(parsed.students) ? parsed.students : [],
+    incomes: Array.isArray(parsed.incomes)
+      ? parsed.incomes.map((item) => ({
+          ...item,
+          currency: item.currency || "USD",
+          exchangeRate: item.exchangeRate || 1,
+          originalAmount: item.originalAmount ?? item.amount,
+          receiptLevel: item.receiptLevel || item.level || ""
+        }))
+      : [],
+    expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
+    teacherPayments: Array.isArray(parsed.teacherPayments) ? parsed.teacherPayments : [],
+    investments: Array.isArray(parsed.investments) ? parsed.investments : []
+  };
+
+  saveData(merged);
 }
 
-function migrateData(data) {
-  const base = createEmptyData();
-  return {
-    incomeCategories: data.incomeCategories || base.incomeCategories,
-    expenseCategories: data.expenseCategories || base.expenseCategories,
-    investmentCategories: data.investmentCategories || base.investmentCategories,
-    accounts: Array.isArray(data.accounts) && data.accounts.length ? data.accounts : base.accounts,
-    students: Array.isArray(data.students) ? data.students : [],
-    incomes: Array.isArray(data.incomes) ? data.incomes.map((item) => ({
-      ...item,
-      currency: item.currency || "USD",
-      exchangeRate: item.exchangeRate || 1,
-      originalAmount: item.originalAmount ?? item.amount
-    })) : [],
-    expenses: Array.isArray(data.expenses) ? data.expenses : [],
-    teacherPayments: Array.isArray(data.teacherPayments) ? data.teacherPayments : [],
-    investments: Array.isArray(data.investments) ? data.investments : []
-  };
+function getData() {
+  return JSON.parse(localStorage.getItem(STORAGE_KEY)) || createEmptyData();
+}
+
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
 function initLogin() {
@@ -141,10 +153,7 @@ function initLogin() {
       JSON.stringify({ email, at: new Date().toISOString() })
     );
 
-    toast("Acceso concedido.");
-    setTimeout(() => {
-      window.location.href = "index.html";
-    }, 400);
+    window.location.href = "index.html";
   });
 }
 
@@ -160,17 +169,12 @@ function bindLogout() {
 function bindResetButtons() {
   document.querySelectorAll("[data-reset-demo]").forEach((button) => {
     button.addEventListener("click", () => {
-      const confirmed = window.confirm(
-        "Se borrarán todos los datos guardados de estudiantes, ingresos, gastos, cuentas, maestros e inversiones. ¿Deseas continuar?"
-      );
-
+      const confirmed = window.confirm("Se borrarán todos los datos guardados. ¿Deseas continuar?");
       if (!confirmed) return;
 
       saveData(createEmptyData());
       toast("Datos reiniciados correctamente.");
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
+      setTimeout(() => window.location.reload(), 300);
     });
   });
 }
@@ -191,58 +195,58 @@ function renderDashboard(data) {
   setText("dashboardStudentsPending", String(studentStats.pending));
   setText("dashboardStudentsLate", String(studentStats.late));
 
-  const movementContainer = document.getElementById("recentMovements");
   const recent = buildRecentMovements(data).slice(0, 6);
-
+  const movementContainer = document.getElementById("recentMovements");
   if (movementContainer) {
     movementContainer.innerHTML = recent.length
       ? recent.map((item) => `
-          <div class="movement-item">
-            <div class="movement-meta">
-              <strong>${item.title}</strong>
-              <small>${item.dateLabel} · ${item.subtitle}</small>
-            </div>
-            <div class="${item.positive ? "amount-positive" : "amount-negative"}">
-              ${item.positive ? "+" : "-"}${formatCurrency(item.amount)}
-            </div>
+        <div class="movement-item">
+          <div class="movement-meta">
+            <strong>${item.title}</strong>
+            <small>${item.dateLabel} · ${item.subtitle}</small>
           </div>
-        `).join("")
+          <div class="${item.positive ? "amount-positive" : "amount-negative"}">
+            ${item.positive ? "+" : "-"}${formatCurrency(item.amount)}
+          </div>
+        </div>
+      `).join("")
       : emptyMessage("Aún no hay movimientos registrados.");
   }
 
   const alertsContainer = document.getElementById("studentsAlerts");
   if (alertsContainer) {
-    const alertItems = studentStats.details
-      .filter((item) => item.statusPayment === "Retrasado" || item.statusPayment === "Pendiente")
+    const alerts = studentStats.details
+      .filter((item) => item.statusPayment === "Pendiente" || item.statusPayment === "Retrasado")
       .slice(0, 5);
 
-    alertsContainer.innerHTML = alertItems.length
-      ? alertItems.map((student) => `
-          <div class="mini-stat-card">
-            <span>${student.name}</span>
-            <strong>${student.statusPayment}</strong>
-            <small>Saldo pendiente: ${formatCurrency(student.pendingAmount)}</small>
-          </div>
-        `).join("")
+    alertsContainer.innerHTML = alerts.length
+      ? alerts.map((student) => `
+        <div class="mini-stat-card">
+          <span>${student.name}</span>
+          <strong>${student.statusPayment}</strong>
+          <small>Saldo pendiente: ${formatCurrency(student.pendingAmount)}</small>
+        </div>
+      `).join("")
       : emptyMessage("No hay alumnos pendientes o retrasados.");
   }
 }
 
 function renderStudentsPage(data) {
   const form = document.getElementById("studentForm");
+
   if (form) {
     form.addEventListener("submit", (event) => {
       event.preventDefault();
 
       const payload = {
         id: cryptoRandom(),
-        name: form.name.value.trim(),
-        level: form.level.value.trim(),
-        monthlyFee: Number(form.monthlyFee.value),
-        dueDay: Number(form.dueDay.value),
-        status: form.status.value,
-        contact: form.contact.value.trim(),
-        notes: form.notes.value.trim()
+        name: form.elements["name"].value.trim(),
+        level: form.elements["level"].value.trim(),
+        monthlyFee: Number(form.elements["monthlyFee"].value),
+        dueDay: Number(form.elements["dueDay"].value),
+        status: form.elements["status"].value,
+        contact: form.elements["contact"].value.trim(),
+        notes: form.elements["notes"].value.trim()
       };
 
       if (!payload.name || !payload.level || payload.monthlyFee <= 0 || payload.dueDay < 1 || payload.dueDay > 31) {
@@ -262,7 +266,7 @@ function renderStudentsPage(data) {
       data.students.unshift(payload);
       saveData(data);
       toast("Estudiante guardado correctamente.");
-      window.location.reload();
+      setTimeout(() => window.location.reload(), 300);
     });
   }
 
@@ -277,12 +281,12 @@ function renderStudentsPage(data) {
   if (summaryCards) {
     summaryCards.innerHTML = stats.details.length
       ? stats.details.slice(0, 5).map((student) => `
-          <div class="mini-stat-card">
-            <span>${student.name}</span>
-            <strong>${student.statusPayment}</strong>
-            <small>Último pago: ${student.lastPayment ? formatDate(student.lastPayment) : "Sin pago"}</small>
-          </div>
-        `).join("")
+        <div class="mini-stat-card">
+          <span>${student.name}</span>
+          <strong>${student.statusPayment}</strong>
+          <small>Último pago: ${student.lastPayment ? formatDate(student.lastPayment) : "Sin pago"}</small>
+        </div>
+      `).join("")
       : emptyMessage("Aún no hay estudiantes registrados.");
   }
 
@@ -290,18 +294,18 @@ function renderStudentsPage(data) {
   if (tableBody) {
     tableBody.innerHTML = stats.details.length
       ? stats.details.map((student) => `
-          <tr>
-            <td>${student.name}</td>
-            <td>${student.level}</td>
-            <td>${formatCurrency(student.monthlyFee)}</td>
-            <td>${student.lastPayment ? formatDate(student.lastPayment) : "Sin pago"}</td>
-            <td>${formatDueDate(student.nextDueDate)}</td>
-            <td>${formatCurrency(student.paidThisMonth)}</td>
-            <td class="${student.pendingAmount > 0 ? "amount-negative" : "amount-positive"}">${formatCurrency(student.pendingAmount)}</td>
-            <td>${student.statusPayment}</td>
-            <td>${student.status}</td>
-          </tr>
-        `).join("")
+        <tr>
+          <td>${student.name}</td>
+          <td>${student.level}</td>
+          <td>${formatCurrency(student.monthlyFee)}</td>
+          <td>${student.lastPayment ? formatDate(student.lastPayment) : "Sin pago"}</td>
+          <td>${formatDueDate(student.nextDueDate)}</td>
+          <td>${formatCurrency(student.paidThisMonth)}</td>
+          <td class="${student.pendingAmount > 0 ? "amount-negative" : "amount-positive"}">${formatCurrency(student.pendingAmount)}</td>
+          <td>${student.statusPayment}</td>
+          <td>${student.status}</td>
+        </tr>
+      `).join("")
       : `<tr><td colspan="9">No hay estudiantes registrados.</td></tr>`;
   }
 }
@@ -314,18 +318,15 @@ function renderIncomesPage(data) {
   if (form) {
     form.date.value = todayValue();
 
-    const studentInput = form.querySelector('[name="student"]');
+    const studentInput = form.elements["student"];
     if (studentInput) {
-      studentInput.setAttribute(
-        "list",
-        ensureStudentDatalist(data.students)
-      );
+      studentInput.setAttribute("list", ensureStudentDatalist(data.students));
     }
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
 
-      const currency = form.currency ? form.currency.value : "USD";
+      const currency = form.elements["currency"].value;
       let exchangeRate = 1;
 
       if (currency === "NIO") {
@@ -338,25 +339,24 @@ function renderIncomesPage(data) {
         }
       }
 
-      const originalAmount = Number(form.amount.value);
-      const amountUsd = currency === "NIO"
-        ? originalAmount / exchangeRate
-        : originalAmount;
+      const originalAmount = Number(form.elements["amount"].value);
+      const amountUsd = currency === "NIO" ? originalAmount / exchangeRate : originalAmount;
 
       const payload = {
         id: cryptoRandom(),
-        date: form.date.value,
-        student: form.student.value.trim(),
-        level: form.level.value.trim(),
-        concept: form.concept.value.trim(),
-        category: form.category.value,
-        method: form.method.value,
+        date: form.elements["date"].value,
+        student: form.elements["student"].value.trim(),
+        level: form.elements["level"].value.trim(),
+        receiptLevel: form.elements["level"].value.trim(),
+        concept: form.elements["concept"].value.trim(),
+        category: form.elements["category"].value,
+        method: form.elements["method"].value,
         currency,
         exchangeRate,
         originalAmount,
         amount: amountUsd,
-        notes: form.notes.value.trim(),
-        account: form.account.value
+        notes: form.elements["notes"].value.trim(),
+        account: form.elements["account"].value
       };
 
       if (!payload.date || !payload.student || !payload.level || !payload.concept || payload.originalAmount <= 0) {
@@ -367,8 +367,8 @@ function renderIncomesPage(data) {
       data.incomes.unshift(payload);
       syncIncomeToStudent(data, payload);
       saveData(data);
-      toast("Ingreso guardado correctamente en USD.");
-      window.location.reload();
+      toast("Ingreso guardado correctamente.");
+      setTimeout(() => window.location.reload(), 300);
     });
   }
 
@@ -376,26 +376,335 @@ function renderIncomesPage(data) {
   if (table) {
     table.innerHTML = data.incomes.length
       ? data.incomes.map((item) => `
-          <tr>
-            <td>${formatDate(item.date)}</td>
-            <td>${item.student}</td>
-            <td>${item.level}</td>
-            <td>${item.category}</td>
-            <td>${item.concept}</td>
-            <td>${item.method}</td>
-            <td>${item.currency || "USD"}</td>
-            <td>${formatOriginalCurrency(item.originalAmount ?? item.amount, item.currency || "USD")}</td>
-            <td>${item.currency === "NIO" ? item.exchangeRate : "1.00"}</td>
-            <td class="amount-positive">${formatCurrency(item.amount)}</td>
-            <td>${item.account}</td>
-          </tr>
-        `).join("")
-      : `<tr><td colspan="11">No hay ingresos registrados.</td></tr>`;
+        <tr>
+          <td>${formatDate(item.date)}</td>
+          <td>${item.student}</td>
+          <td>${item.level}</td>
+          <td>${item.category}</td>
+          <td>${item.concept}</td>
+          <td>${item.method}</td>
+          <td>${item.currency || "USD"}</td>
+          <td>${formatOriginalCurrency(item.originalAmount ?? item.amount, item.currency || "USD")}</td>
+          <td>${item.currency === "NIO" ? item.exchangeRate : "1.00"}</td>
+          <td class="amount-positive">${formatCurrency(item.amount)}</td>
+          <td>${item.account}</td>
+          <td>
+            <button class="btn btn-secondary btn-sm" data-receipt-id="${item.id}">
+              Recibo PDF
+            </button>
+          </td>
+        </tr>
+      `).join("")
+      : `<tr><td colspan="12">No hay ingresos registrados.</td></tr>`;
   }
+
+  bindReceiptButtons(data);
 
   setText("incomeTotalCount", String(data.incomes.length));
   setText("incomeTotalAmount", formatCurrency(sumBy(data.incomes, "amount")));
   setText("incomeLastStudent", data.incomes[0]?.student || "Sin datos");
+}
+
+function bindReceiptButtons(data) {
+  document.querySelectorAll("[data-receipt-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = button.getAttribute("data-receipt-id");
+      generateReceiptPDF(data, id);
+    });
+  });
+}
+
+function generateReceiptPDF(data, incomeId) {
+  const income = data.incomes.find((item) => item.id === incomeId);
+  if (!income) {
+    toast("No se encontró el ingreso para generar el recibo.");
+    return;
+  }
+
+  const editedLevel = window.prompt(
+    "Puedes editar el nivel para este recibo:",
+    income.receiptLevel || income.level || ""
+  );
+
+  if (editedLevel === null) return;
+
+  income.receiptLevel = editedLevel.trim() || income.level || "";
+  saveData(data);
+
+  const receiptNumber = `REC-${income.date.replaceAll("-", "")}-${income.id.slice(0, 4).toUpperCase()}`;
+  const amountOriginal = formatOriginalCurrency(income.originalAmount ?? income.amount, income.currency || "USD");
+  const amountUsd = formatCurrency(income.amount);
+  const academyLogo = "foto8.jpg.jpg";
+
+  const receiptWindow = window.open("", "_blank", "width=900,height=1100");
+
+  if (!receiptWindow) {
+    toast("Tu navegador bloqueó la ventana del recibo.");
+    return;
+  }
+
+  receiptWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8" />
+      <title>Recibo ${receiptNumber}</title>
+      <style>
+        * { box-sizing: border-box; }
+        body {
+          margin: 0;
+          font-family: "Segoe UI", Arial, sans-serif;
+          background: #eef3f8;
+          color: #10233b;
+          padding: 32px;
+        }
+        .receipt-sheet {
+          max-width: 850px;
+          margin: 0 auto;
+          background: #ffffff;
+          border-radius: 24px;
+          overflow: hidden;
+          box-shadow: 0 24px 60px rgba(16, 35, 59, 0.18);
+          border: 1px solid rgba(16, 35, 59, 0.08);
+        }
+        .receipt-top {
+          background: linear-gradient(135deg, #0e2238, #1e4f92 60%, #2f6fd0);
+          color: white;
+          padding: 36px;
+          display: flex;
+          justify-content: space-between;
+          gap: 24px;
+          align-items: center;
+        }
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 18px;
+        }
+        .brand img {
+          width: 92px;
+          height: 92px;
+          object-fit: cover;
+          background: rgba(255,255,255,0.12);
+          border-radius: 18px;
+          padding: 6px;
+        }
+        .brand h1 {
+          margin: 0 0 6px;
+          font-size: 1.7rem;
+        }
+        .brand p {
+          margin: 0;
+          opacity: 0.9;
+        }
+        .receipt-tag {
+          text-align: right;
+        }
+        .receipt-tag span {
+          display: block;
+          font-size: 0.82rem;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          opacity: 0.85;
+        }
+        .receipt-tag strong {
+          display: block;
+          margin-top: 10px;
+          font-size: 1.2rem;
+        }
+        .receipt-body {
+          padding: 34px;
+        }
+        .intro-box {
+          background: linear-gradient(135deg, #f4f8fc, #ffffff);
+          border: 1px solid rgba(16, 35, 59, 0.08);
+          border-radius: 20px;
+          padding: 22px;
+          margin-bottom: 24px;
+        }
+        .intro-box h2 {
+          margin: 0 0 8px;
+          color: #0f2b4b;
+        }
+        .intro-box p {
+          margin: 0;
+          color: #50657f;
+          line-height: 1.6;
+        }
+        .detail-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 18px;
+          margin-bottom: 24px;
+        }
+        .detail-card {
+          border: 1px solid rgba(16, 35, 59, 0.08);
+          border-radius: 18px;
+          padding: 18px;
+          background: #fbfdff;
+        }
+        .detail-card span {
+          display: block;
+          font-size: 0.8rem;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          color: #6d7f94;
+          margin-bottom: 8px;
+        }
+        .detail-card strong {
+          display: block;
+          font-size: 1.08rem;
+          color: #10233b;
+        }
+        .amount-box {
+          margin-top: 10px;
+          background: linear-gradient(135deg, #0f2742, #173e6c);
+          color: white;
+          border-radius: 22px;
+          padding: 24px;
+        }
+        .amount-box span {
+          display: block;
+          opacity: 0.8;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          font-size: 0.82rem;
+          margin-bottom: 10px;
+        }
+        .amount-box strong {
+          font-size: 2.3rem;
+          display: block;
+          margin-bottom: 8px;
+        }
+        .amount-box small {
+          opacity: 0.86;
+          display: block;
+        }
+        .footer-note {
+          margin-top: 26px;
+          padding-top: 20px;
+          border-top: 1px dashed rgba(16, 35, 59, 0.18);
+          color: #5c6f85;
+          line-height: 1.7;
+        }
+        .print-actions {
+          max-width: 850px;
+          margin: 18px auto 0;
+          display: flex;
+          justify-content: flex-end;
+          gap: 12px;
+        }
+        .print-actions button {
+          border: 0;
+          border-radius: 12px;
+          padding: 12px 16px;
+          cursor: pointer;
+          font-size: 0.95rem;
+        }
+        .btn-print {
+          background: #1e4f92;
+          color: white;
+        }
+        .btn-close {
+          background: #dfe8f2;
+          color: #10233b;
+        }
+        @media print {
+          body {
+            background: white;
+            padding: 0;
+          }
+          .print-actions {
+            display: none;
+          }
+          .receipt-sheet {
+            box-shadow: none;
+            border: none;
+            border-radius: 0;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="receipt-sheet">
+        <div class="receipt-top">
+          <div class="brand">
+            <img src="${academyLogo}" alt="Logo Academia" />
+            <div>
+              <h1>Expressive English Academy</h1>
+              <p>Recibo de pago</p>
+            </div>
+          </div>
+
+          <div class="receipt-tag">
+            <span>Recibo</span>
+            <strong>${receiptNumber}</strong>
+          </div>
+        </div>
+
+        <div class="receipt-body">
+          <div class="intro-box">
+            <h2>Pago recibido correctamente</h2>
+            <p>
+              Este documento confirma la recepción del pago realizado a
+              Expressive English Academy.
+            </p>
+          </div>
+
+          <div class="detail-grid">
+            <div class="detail-card">
+              <span>Fecha de pago</span>
+              <strong>${formatDate(income.date)}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Estudiante</span>
+              <strong>${income.student}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Nivel</span>
+              <strong>${income.receiptLevel || income.level || "-"}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Concepto</span>
+              <strong>${income.concept}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Método de pago</span>
+              <strong>${income.method}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Cuenta destino</span>
+              <strong>${income.account}</strong>
+            </div>
+          </div>
+
+          <div class="amount-box">
+            <span>Monto recibido</span>
+            <strong>${amountOriginal}</strong>
+            <small>Equivalente en USD: ${amountUsd}</small>
+          </div>
+
+          <div class="footer-note">
+            Gracias por confiar en Expressive English Academy.
+            Este recibo fue generado desde la plataforma privada de administración financiera.
+          </div>
+        </div>
+      </div>
+
+      <div class="print-actions">
+        <button class="btn-close" onclick="window.close()">Cerrar</button>
+        <button class="btn-print" onclick="window.print()">Descargar / Guardar PDF</button>
+      </div>
+    </body>
+    </html>
+  `);
+
+  receiptWindow.document.close();
 }
 
 function renderExpensesPage(data) {
@@ -412,12 +721,12 @@ function renderExpensesPage(data) {
 
       const payload = {
         id: cryptoRandom(),
-        date: form.date.value,
-        description: form.description.value.trim(),
-        category: form.category.value,
-        amount: Number(form.amount.value),
-        account: form.account.value,
-        notes: form.notes.value.trim()
+        date: form.elements["date"].value,
+        description: form.elements["description"].value.trim(),
+        category: form.elements["category"].value,
+        amount: Number(form.elements["amount"].value),
+        account: form.elements["account"].value,
+        notes: form.elements["notes"].value.trim()
       };
 
       if (!payload.date || !payload.description || payload.amount <= 0) {
@@ -428,7 +737,7 @@ function renderExpensesPage(data) {
       data.expenses.unshift(payload);
       saveData(data);
       toast("Gasto guardado correctamente.");
-      window.location.reload();
+      setTimeout(() => window.location.reload(), 300);
     });
   }
 
@@ -436,15 +745,14 @@ function renderExpensesPage(data) {
   if (categoryForm) {
     categoryForm.addEventListener("submit", (event) => {
       event.preventDefault();
-
-      const name = categoryForm.categoryName.value.trim().toLowerCase();
+      const name = categoryForm.elements["categoryName"].value.trim().toLowerCase();
       if (!name) return;
 
       if (!data.expenseCategories.includes(name)) {
         data.expenseCategories.push(name);
         saveData(data);
         toast("Categoría agregada.");
-        window.location.reload();
+        setTimeout(() => window.location.reload(), 300);
       } else {
         toast("Esa categoría ya existe.");
       }
@@ -455,15 +763,15 @@ function renderExpensesPage(data) {
   if (table) {
     table.innerHTML = data.expenses.length
       ? data.expenses.map((item) => `
-          <tr>
-            <td>${formatDate(item.date)}</td>
-            <td>${item.description}</td>
-            <td>${item.category}</td>
-            <td class="amount-negative">${formatCurrency(item.amount)}</td>
-            <td>${item.account}</td>
-            <td>${item.notes || "-"}</td>
-          </tr>
-        `).join("")
+        <tr>
+          <td>${formatDate(item.date)}</td>
+          <td>${item.description}</td>
+          <td>${item.category}</td>
+          <td class="amount-negative">${formatCurrency(item.amount)}</td>
+          <td>${item.account}</td>
+          <td>${item.notes || "-"}</td>
+        </tr>
+      `).join("")
       : `<tr><td colspan="6">No hay gastos registrados.</td></tr>`;
   }
 
@@ -474,9 +782,8 @@ function renderExpensesPage(data) {
 
 function renderAccountsPage(data) {
   const balances = getAccountBalances(data);
-  const cards = document.getElementById("accountsCards");
-  const table = document.getElementById("accountsTableBody");
 
+  const cards = document.getElementById("accountsCards");
   if (cards) {
     cards.innerHTML = balances.map((account) => `
       <article class="metric-card glass-card">
@@ -487,6 +794,7 @@ function renderAccountsPage(data) {
     `).join("");
   }
 
+  const table = document.getElementById("accountsTableBody");
   if (table) {
     table.innerHTML = balances.map((account) => `
       <tr>
@@ -512,10 +820,10 @@ function renderAccountsPage(data) {
 
       const payload = {
         id: cryptoRandom(),
-        name: form.name.value.trim(),
-        type: form.type.value,
-        initialBalance: Number(form.initialBalance.value),
-        notes: form.notes.value.trim()
+        name: form.elements["name"].value.trim(),
+        type: form.elements["type"].value,
+        initialBalance: Number(form.elements["initialBalance"].value),
+        notes: form.elements["notes"].value.trim()
       };
 
       if (!payload.name || Number.isNaN(payload.initialBalance)) {
@@ -526,7 +834,7 @@ function renderAccountsPage(data) {
       data.accounts.push(payload);
       saveData(data);
       toast("Cuenta guardada correctamente.");
-      window.location.reload();
+      setTimeout(() => window.location.reload(), 300);
     });
   }
 }
@@ -541,11 +849,11 @@ function renderTeachersPage(data) {
 
       const payload = {
         id: cryptoRandom(),
-        teacher: form.teacher.value.trim(),
-        date: form.date.value,
-        amount: Number(form.amount.value),
-        period: form.period.value.trim(),
-        notes: form.notes.value.trim()
+        teacher: form.elements["teacher"].value.trim(),
+        date: form.elements["date"].value,
+        amount: Number(form.elements["amount"].value),
+        period: form.elements["period"].value.trim(),
+        notes: form.elements["notes"].value.trim()
       };
 
       if (!payload.teacher || !payload.date || payload.amount <= 0 || !payload.period) {
@@ -556,7 +864,7 @@ function renderTeachersPage(data) {
       data.teacherPayments.unshift(payload);
       saveData(data);
       toast("Pago registrado correctamente.");
-      window.location.reload();
+      setTimeout(() => window.location.reload(), 300);
     });
   }
 
@@ -564,14 +872,14 @@ function renderTeachersPage(data) {
   if (table) {
     table.innerHTML = data.teacherPayments.length
       ? data.teacherPayments.map((item) => `
-          <tr>
-            <td>${item.teacher}</td>
-            <td>${formatDate(item.date)}</td>
-            <td class="amount-negative">${formatCurrency(item.amount)}</td>
-            <td>${item.period}</td>
-            <td>${item.notes || "-"}</td>
-          </tr>
-        `).join("")
+        <tr>
+          <td>${item.teacher}</td>
+          <td>${formatDate(item.date)}</td>
+          <td class="amount-negative">${formatCurrency(item.amount)}</td>
+          <td>${item.period}</td>
+          <td>${item.notes || "-"}</td>
+        </tr>
+      `).join("")
       : `<tr><td colspan="5">No hay pagos a maestros registrados.</td></tr>`;
   }
 
@@ -581,12 +889,12 @@ function renderTeachersPage(data) {
     const entries = Object.entries(summary);
     container.innerHTML = entries.length
       ? entries.map(([teacher, amount]) => `
-          <div class="mini-stat-card">
-            <span>${teacher}</span>
-            <strong>${formatCurrency(amount)}</strong>
-            <small>Total acumulado pagado</small>
-          </div>
-        `).join("")
+        <div class="mini-stat-card">
+          <span>${teacher}</span>
+          <strong>${formatCurrency(amount)}</strong>
+          <small>Total acumulado pagado</small>
+        </div>
+      `).join("")
       : emptyMessage("Aún no hay pagos registrados.");
   }
 }
@@ -605,12 +913,12 @@ function renderInvestmentsPage(data) {
 
       const payload = {
         id: cryptoRandom(),
-        date: form.date.value,
-        concept: form.concept.value.trim(),
-        category: form.category.value,
-        amount: Number(form.amount.value),
-        account: form.account.value,
-        notes: form.notes.value.trim()
+        date: form.elements["date"].value,
+        concept: form.elements["concept"].value.trim(),
+        category: form.elements["category"].value,
+        amount: Number(form.elements["amount"].value),
+        account: form.elements["account"].value,
+        notes: form.elements["notes"].value.trim()
       };
 
       if (!payload.date || !payload.concept || payload.amount <= 0) {
@@ -621,7 +929,7 @@ function renderInvestmentsPage(data) {
       data.investments.unshift(payload);
       saveData(data);
       toast("Inversión guardada correctamente.");
-      window.location.reload();
+      setTimeout(() => window.location.reload(), 300);
     });
   }
 
@@ -630,14 +938,14 @@ function renderInvestmentsPage(data) {
     categoryForm.addEventListener("submit", (event) => {
       event.preventDefault();
 
-      const name = categoryForm.categoryName.value.trim().toLowerCase();
+      const name = categoryForm.elements["categoryName"].value.trim().toLowerCase();
       if (!name) return;
 
       if (!data.investmentCategories.includes(name)) {
         data.investmentCategories.push(name);
         saveData(data);
         toast("Categoría agregada.");
-        window.location.reload();
+        setTimeout(() => window.location.reload(), 300);
       } else {
         toast("Esa categoría ya existe.");
       }
@@ -648,15 +956,15 @@ function renderInvestmentsPage(data) {
   if (table) {
     table.innerHTML = data.investments.length
       ? data.investments.map((item) => `
-          <tr>
-            <td>${formatDate(item.date)}</td>
-            <td>${item.concept}</td>
-            <td>${item.category}</td>
-            <td class="amount-negative">${formatCurrency(item.amount)}</td>
-            <td>${item.account}</td>
-            <td>${item.notes || "-"}</td>
-          </tr>
-        `).join("")
+        <tr>
+          <td>${formatDate(item.date)}</td>
+          <td>${item.concept}</td>
+          <td>${item.category}</td>
+          <td class="amount-negative">${formatCurrency(item.amount)}</td>
+          <td>${item.account}</td>
+          <td>${item.notes || "-"}</td>
+        </tr>
+      `).join("")
       : `<tr><td colspan="6">No hay inversiones registradas.</td></tr>`;
   }
 
@@ -686,16 +994,16 @@ function renderReportsPage(data) {
   if (categoryBars) {
     categoryBars.innerHTML = categories.length
       ? categories.map((item) => `
-          <div class="bar-row">
-            <div class="bar-row-head">
-              <strong>${item.label}</strong>
-              <span>${formatCurrency(item.amount)}</span>
-            </div>
-            <div class="bar-track">
-              <div class="bar-fill" style="width:${(item.amount / maxCategory) * 100}%"></div>
-            </div>
+        <div class="bar-row">
+          <div class="bar-row-head">
+            <strong>${item.label}</strong>
+            <span>${formatCurrency(item.amount)}</span>
           </div>
-        `).join("")
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${(item.amount / maxCategory) * 100}%"></div>
+          </div>
+        </div>
+      `).join("")
       : emptyMessage("No hay datos para generar categorías.");
   }
 
@@ -705,28 +1013,25 @@ function renderReportsPage(data) {
     const entries = Object.entries(teacherSummary);
     teacherCards.innerHTML = entries.length
       ? entries.map(([teacher, amount]) => `
-          <div class="mini-stat-card">
-            <span>${teacher}</span>
-            <strong>${formatCurrency(amount)}</strong>
-            <small>Pagos acumulados</small>
-          </div>
-        `).join("")
+        <div class="mini-stat-card">
+          <span>${teacher}</span>
+          <strong>${formatCurrency(amount)}</strong>
+          <small>Pagos acumulados</small>
+        </div>
+      `).join("")
       : emptyMessage("No hay pagos a maestros registrados.");
   }
 
   const studentCards = document.getElementById("studentStatusCards");
   if (studentCards) {
     studentCards.innerHTML = studentStats.details.length
-      ? studentStats.details
-          .filter((student) => student.status === "Activo")
-          .slice(0, 6)
-          .map((student) => `
-            <div class="mini-stat-card">
-              <span>${student.name}</span>
-              <strong>${student.statusPayment}</strong>
-              <small>Saldo pendiente: ${formatCurrency(student.pendingAmount)}</small>
-            </div>
-          `).join("")
+      ? studentStats.details.slice(0, 6).map((student) => `
+        <div class="mini-stat-card">
+          <span>${student.name}</span>
+          <strong>${student.statusPayment}</strong>
+          <small>Saldo pendiente: ${formatCurrency(student.pendingAmount)}</small>
+        </div>
+      `).join("")
       : emptyMessage("No hay estudiantes registrados.");
   }
 
@@ -740,34 +1045,66 @@ function renderReportsPage(data) {
       <tr><td>Balance general</td><td>${formatCurrency(metrics.totalBalance)}</td></tr>
       <tr><td>Total en caja</td><td>${formatCurrency(metrics.cajaTotal)}</td></tr>
       <tr><td>Estudiantes activos</td><td>${studentStats.active}</td></tr>
-      <tr><td>Estudiantes al día</td><td>${studentStats.onTime}</td></tr>
-      <tr><td>Estudiantes pendientes</td><td>${studentStats.pending}</td></tr>
-      <tr><td>Estudiantes retrasados</td><td>${studentStats.late}</td></tr>
+      <tr><td>Al día</td><td>${studentStats.onTime}</td></tr>
+      <tr><td>Pendientes</td><td>${studentStats.pending}</td></tr>
+      <tr><td>Retrasados</td><td>${studentStats.late}</td></tr>
     `;
   }
 
   const downloadButton = document.getElementById("downloadMonthlyReportBtn");
   if (downloadButton) {
-    downloadButton.addEventListener("click", () => {
-      downloadCurrentMonthReport(data, studentStats);
-    });
+    downloadButton.addEventListener("click", () => downloadCurrentMonthReport(data, studentStats));
   }
+}
+
+function computeMetrics(data) {
+  const totalIncome = sumBy(data.incomes, "amount");
+  const totalExpenses =
+    sumBy(data.expenses, "amount") +
+    sumBy(data.teacherPayments, "amount") +
+    sumBy(data.investments, "amount");
+
+  const totalBalance = totalIncome - totalExpenses;
+  const month = currentMonth();
+  const year = currentYear();
+
+  const incomesMonth = data.incomes
+    .filter((item) => isSameMonth(item.date, month, year))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const expensesMonth =
+    data.expenses.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0) +
+    data.teacherPayments.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0) +
+    data.investments.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const balanceMonth = incomesMonth - expensesMonth;
+  const cajaTotal = getAccountBalances(data).reduce((sum, item) => sum + item.current, 0);
+
+  return {
+    totalIncome,
+    totalExpenses,
+    totalBalance,
+    incomesMonth,
+    expensesMonth,
+    balanceMonth,
+    cajaTotal
+  };
 }
 
 function computeStudentStats(data) {
   const activeStudents = data.students.filter((student) => student.status === "Activo");
 
   const details = activeStudents.map((student) => {
-    const studentPayments = data.incomes
+    const payments = data.incomes
       .filter((income) => income.student.toLowerCase() === student.name.toLowerCase())
       .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    const lastPayment = studentPayments[0]?.date || null;
-    const paidThisMonth = studentPayments
+    const lastPayment = payments[0]?.date || null;
+    const paidThisMonth = payments
       .filter((payment) => isSameMonth(payment.date, currentMonth(), currentYear()))
       .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 
-    const pendingAmount = Math.max(student.monthlyFee - paidThisMonth, 0);
+    const pendingAmount = Math.max(Number(student.monthlyFee || 0) - paidThisMonth, 0);
     const nextDueDate = buildDueDate(student.dueDay);
 
     let statusPayment = "Pendiente";
@@ -799,79 +1136,6 @@ function computeStudentStats(data) {
   };
 }
 
-function syncIncomeToStudent(data, income) {
-  const foundStudent = data.students.find(
-    (student) => student.name.toLowerCase() === income.student.toLowerCase()
-  );
-
-  if (!foundStudent) {
-    return;
-  }
-
-  if (!foundStudent.level && income.level) {
-    foundStudent.level = income.level;
-  }
-}
-
-function buildDueDate(dueDay) {
-  const year = currentYear();
-  const month = currentMonth();
-  const lastDay = new Date(year, month + 1, 0).getDate();
-  const safeDay = Math.min(dueDay, lastDay);
-  return new Date(year, month, safeDay, 23, 59, 59);
-}
-
-function renderTagList(id, items) {
-  const container = document.getElementById(id);
-  if (!container) return;
-  container.innerHTML = items.map((item) => `<div class="tag-item">${capitalize(item)}</div>`).join("");
-}
-
-function fillSelect(id, values) {
-  const select = document.getElementById(id);
-  if (!select) return;
-  select.innerHTML = values.map((value) => `<option value="${value}">${value}</option>`).join("");
-}
-
-function updateSidebarCaja(data) {
-  const metrics = computeMetrics(data);
-  setText("sidebarCaja", formatCurrency(metrics.cajaTotal));
-}
-
-function computeMetrics(data) {
-  const totalIncome = sumBy(data.incomes, "amount");
-  const operationalExpenses = sumBy(data.expenses, "amount");
-  const teacherExpenses = sumBy(data.teacherPayments, "amount");
-  const investmentExpenses = sumBy(data.investments, "amount");
-  const totalExpenses = operationalExpenses + teacherExpenses + investmentExpenses;
-  const totalBalance = totalIncome - totalExpenses;
-
-  const month = currentMonth();
-  const year = currentYear();
-
-  const incomesMonth = data.incomes
-    .filter((item) => isSameMonth(item.date, month, year))
-    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-
-  const expensesMonth =
-    data.expenses.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0) +
-    data.teacherPayments.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0) +
-    data.investments.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0);
-
-  const balanceMonth = incomesMonth - expensesMonth;
-  const cajaTotal = getAccountBalances(data).reduce((sum, item) => sum + item.current, 0);
-
-  return {
-    totalIncome,
-    totalExpenses,
-    totalBalance,
-    incomesMonth,
-    expensesMonth,
-    balanceMonth,
-    cajaTotal
-  };
-}
-
 function getAccountBalances(data) {
   return data.accounts.map((account) => {
     const incomeTotal = data.incomes
@@ -894,6 +1158,16 @@ function getAccountBalances(data) {
 
     return { ...account, current };
   });
+}
+
+function syncIncomeToStudent(data, income) {
+  const foundStudent = data.students.find(
+    (student) => student.name.toLowerCase() === income.student.toLowerCase()
+  );
+  if (!foundStudent) return;
+  if (!foundStudent.level && income.level) {
+    foundStudent.level = income.level;
+  }
 }
 
 function buildRecentMovements(data) {
@@ -935,8 +1209,8 @@ function buildRecentMovements(data) {
 
 function buildCategoryReport(data) {
   const map = {};
-  data.expenses.forEach((item) => addToMap(map, `Gasto: ${capitalize(item.category)}`, Number(item.amount || 0)));
-  data.investments.forEach((item) => addToMap(map, `Inversión: ${capitalize(item.category)}`, Number(item.amount || 0)));
+  data.expenses.forEach((item) => addToMap(map, `Gasto: ${capitalize(item.category)}`, item.amount));
+  data.investments.forEach((item) => addToMap(map, `Inversión: ${capitalize(item.category)}`, item.amount));
   addToMap(map, "Pagos a maestros", sumBy(data.teacherPayments, "amount"));
 
   return Object.entries(map)
@@ -953,124 +1227,23 @@ function summarizeBy(list, field) {
 
 function topCategory(list, field) {
   if (!list.length) return "Sin datos";
-
   const summary = list.reduce((acc, item) => {
     acc[item[field]] = (acc[item[field]] || 0) + Number(item.amount || 0);
     return acc;
   }, {});
-
   return Object.entries(summary).sort((a, b) => b[1] - a[1])[0][0];
 }
 
-function downloadCurrentMonthReport(data, studentStats) {
-  const month = currentMonth();
-  const year = currentYear();
-  const monthLabel = new Date(year, month, 1).toLocaleDateString("es-MX", {
-    month: "long",
-    year: "numeric"
-  });
+function fillSelect(id, values) {
+  const select = document.getElementById(id);
+  if (!select) return;
+  select.innerHTML = values.map((value) => `<option value="${value}">${value}</option>`).join("");
+}
 
-  const incomes = data.incomes.filter((item) => isSameMonth(item.date, month, year));
-  const expenses = data.expenses.filter((item) => isSameMonth(item.date, month, year));
-  const teachers = data.teacherPayments.filter((item) => isSameMonth(item.date, month, year));
-  const investments = data.investments.filter((item) => isSameMonth(item.date, month, year));
-
-  const incomeTotal = sumBy(incomes, "amount");
-  const expenseTotal = sumBy(expenses, "amount");
-  const teacherTotal = sumBy(teachers, "amount");
-  const investmentTotal = sumBy(investments, "amount");
-  const totalExpenses = expenseTotal + teacherTotal + investmentTotal;
-  const balance = incomeTotal - totalExpenses;
-  const caja = getAccountBalances(data).reduce((sum, item) => sum + item.current, 0);
-
-  const rows = [
-    ["Reporte mensual", monthLabel],
-    ["Ingresos del mes", incomeTotal],
-    ["Gastos del mes", expenseTotal],
-    ["Pagos a maestros del mes", teacherTotal],
-    ["Inversiones del mes", investmentTotal],
-    ["Balance del mes", balance],
-    ["Total en caja actual", caja],
-    ["Estudiantes activos", studentStats.active],
-    ["Estudiantes al día", studentStats.onTime],
-    ["Estudiantes pendientes", studentStats.pending],
-    ["Estudiantes retrasados", studentStats.late],
-    [],
-    ["Estudiantes"],
-    ["Nombre", "Nivel", "Mensualidad", "Último pago", "Próximo vencimiento", "Pagado este mes", "Pendiente", "Estado"],
-    ...studentStats.details.map((student) => [
-      student.name,
-      student.level,
-      student.monthlyFee,
-      student.lastPayment || "",
-      formatDueDate(student.nextDueDate),
-      student.paidThisMonth,
-      student.pendingAmount,
-      student.statusPayment
-    ]),
-    [],
-    ["Ingresos"],
-    ["Fecha", "Estudiante", "Nivel", "Concepto", "Categoría", "Método", "Moneda", "Monto original", "Tasa", "Monto USD", "Cuenta"],
-    ...incomes.map((item) => [
-      item.date,
-      item.student,
-      item.level,
-      item.concept,
-      item.category,
-      item.method,
-      item.currency || "USD",
-      item.originalAmount ?? item.amount,
-      item.exchangeRate || 1,
-      item.amount,
-      item.account
-    ]),
-    [],
-    ["Gastos"],
-    ["Fecha", "Descripción", "Categoría", "Monto", "Cuenta", "Notas"],
-    ...expenses.map((item) => [
-      item.date,
-      item.description,
-      item.category,
-      item.amount,
-      item.account,
-      item.notes || ""
-    ]),
-    [],
-    ["Pagos a maestros"],
-    ["Fecha", "Maestro", "Monto", "Período", "Notas"],
-    ...teachers.map((item) => [
-      item.date,
-      item.teacher,
-      item.amount,
-      item.period,
-      item.notes || ""
-    ]),
-    [],
-    ["Inversiones"],
-    ["Fecha", "Concepto", "Categoría", "Monto", "Cuenta", "Notas"],
-    ...investments.map((item) => [
-      item.date,
-      item.concept,
-      item.category,
-      item.amount,
-      item.account,
-      item.notes || ""
-    ])
-  ];
-
-  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n");
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `reporte_mensual_${year}-${String(month + 1).padStart(2, "0")}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-
-  toast("Reporte mensual descargado.");
+function renderTagList(id, items) {
+  const container = document.getElementById(id);
+  if (!container) return;
+  container.innerHTML = items.map((item) => `<div class="tag-item">${capitalize(item)}</div>`).join("");
 }
 
 function ensureStudentDatalist(students) {
@@ -1091,21 +1264,72 @@ function ensureStudentDatalist(students) {
   return id;
 }
 
+function buildDueDate(dueDay) {
+  const year = currentYear();
+  const month = currentMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const safeDay = Math.min(Number(dueDay || 1), lastDay);
+  return new Date(year, month, safeDay, 23, 59, 59);
+}
+
+function downloadCurrentMonthReport(data, studentStats) {
+  const month = currentMonth();
+  const year = currentYear();
+  const monthLabel = new Date(year, month, 1).toLocaleDateString("es-MX", {
+    month: "long",
+    year: "numeric"
+  });
+
+  const incomes = data.incomes.filter((item) => isSameMonth(item.date, month, year));
+
+  const rows = [
+    ["Reporte mensual", monthLabel],
+    ["Ingresos", sumBy(incomes, "amount")],
+    ["Estudiantes activos", studentStats.active],
+    ["Al día", studentStats.onTime],
+    ["Pendientes", studentStats.pending],
+    ["Retrasados", studentStats.late],
+    [],
+    ["Ingresos"],
+    ["Fecha", "Estudiante", "Nivel", "Concepto", "Categoría", "Método", "Moneda", "Monto original", "Tasa", "Monto USD", "Cuenta"],
+    ...incomes.map((item) => [
+      item.date,
+      item.student,
+      item.level,
+      item.concept,
+      item.category,
+      item.method,
+      item.currency || "USD",
+      item.originalAmount ?? item.amount,
+      item.exchangeRate || 1,
+      item.amount,
+      item.account
+    ])
+  ];
+
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `reporte_mensual_${year}-${String(month + 1).padStart(2, "0")}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+
+  toast("Reporte mensual descargado.");
+}
+
+function updateSidebarCaja(data) {
+  const metrics = computeMetrics(data);
+  setText("sidebarCaja", formatCurrency(metrics.cajaTotal));
+}
+
 function setText(id, value) {
   const element = document.getElementById(id);
   if (element) element.textContent = value;
-}
-
-function getData() {
-  return JSON.parse(localStorage.getItem(STORAGE_KEY)) || createEmptyData();
-}
-
-function saveData(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-function sumBy(list, field) {
-  return list.reduce((sum, item) => sum + Number(item[field] || 0), 0);
 }
 
 function formatCurrency(value) {
@@ -1124,7 +1348,6 @@ function formatOriginalCurrency(value, currency) {
       maximumFractionDigits: 2
     }).format(Number(value || 0));
   }
-
   return formatCurrency(value);
 }
 
@@ -1146,12 +1369,8 @@ function formatDueDate(date) {
   });
 }
 
-function todayValue() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function sumBy(list, field) {
+  return list.reduce((sum, item) => sum + Number(item[field] || 0), 0);
 }
 
 function currentMonth() {
@@ -1160,6 +1379,14 @@ function currentMonth() {
 
 function currentYear() {
   return new Date().getFullYear();
+}
+
+function todayValue() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 function isSameMonth(dateString, month, year) {
@@ -1194,9 +1421,7 @@ function toast(message) {
   node.textContent = message;
   document.body.appendChild(node);
 
-  setTimeout(() => {
-    node.remove();
-  }, 2400);
+  setTimeout(() => node.remove(), 2200);
 }
 
 function cryptoRandom() {
