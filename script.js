@@ -204,8 +204,23 @@ function renderDashboard(data) {
   setText("dashboardStudentsPending", String(studentStats.pending));
   setText("dashboardStudentsLate", String(studentStats.late));
 
-  const recent = buildRecentMovements(data).slice(0, 6);
+  const recent = buildRecentMovements(data).slice(0, 8);
   const movementContainer = document.getElementById("recentMovements");
+
+  const recentIncome = recent
+    .filter((item) => item.positive)
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const recentDeductions = recent
+    .filter((item) => !item.positive)
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const recentNet = recentIncome - recentDeductions;
+
+  setText("recentIncomeTotal", formatCurrency(recentIncome));
+  setText("recentDeductionTotal", formatCurrency(recentDeductions));
+  setText("recentNetTotal", formatCurrency(recentNet));
+
   if (movementContainer) {
     movementContainer.innerHTML = recent.length
       ? recent.map((item) => `
@@ -1260,21 +1275,21 @@ function buildRecentMovements(data) {
     })),
     ...data.expenses.map((item) => ({
       title: item.description,
-      subtitle: `${item.category} · ${item.account}`,
+      subtitle: `Gasto · ${item.category} · ${item.account}`,
       amount: item.amount,
       date: item.date,
       positive: false
     })),
     ...data.teacherPayments.map((item) => ({
       title: item.teacher,
-      subtitle: `Pago ${item.period}`,
+      subtitle: `Pago a maestro · ${item.period}`,
       amount: item.amount,
       date: item.date,
       positive: false
     })),
     ...data.investments.map((item) => ({
       title: item.concept,
-      subtitle: `${item.category} · ${item.account}`,
+      subtitle: `Inversión · ${item.category} · ${item.account}`,
       amount: item.amount,
       date: item.date,
       positive: false
