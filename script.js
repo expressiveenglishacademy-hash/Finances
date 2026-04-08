@@ -131,7 +131,9 @@ function getData() {
 }
 
 function saveData(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+ localStorage.setItem("eea_finances_app_v4", localStorage.getItem("eea_finances_demo_v2"));
+location.reload();
+;
 }
 
 function initLogin() {
