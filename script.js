@@ -1,4 +1,4 @@
-const STORAGE_KEY = "eea_finances_demo_v1";
+const STORAGE_KEY = "eea_finances_demo_v2";
 const SESSION_KEY = "eea_finances_session";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const handlers = {
     dashboard: () => renderDashboard(data),
+    estudiantes: () => renderStudentsPage(data),
     ingresos: () => renderIncomesPage(data),
     gastos: () => renderExpensesPage(data),
     cuentas: () => renderAccountsPage(data),
@@ -55,19 +56,34 @@ function createEmptyData() {
     accounts: [
       {
         id: cryptoRandom(),
-        name: "Efectivo",
+        name: "Efectivo USD",
         type: "Efectivo",
         initialBalance: 0,
-        notes: ""
+        notes: "Caja en dólares"
       },
       {
         id: cryptoRandom(),
-        name: "Cuenta en banco principal",
+        name: "Efectivo C$",
+        type: "Efectivo",
+        initialBalance: 0,
+        notes: "Caja en córdobas"
+      },
+      {
+        id: cryptoRandom(),
+        name: "Banco USD",
         type: "Banco",
         initialBalance: 0,
-        notes: ""
+        notes: "Cuenta bancaria en dólares"
+      },
+      {
+        id: cryptoRandom(),
+        name: "Banco C$",
+        type: "Banco",
+        initialBalance: 0,
+        notes: "Cuenta bancaria en córdobas"
       }
     ],
+    students: [],
     incomes: [],
     expenses: [],
     teacherPayments: [],
@@ -78,7 +94,31 @@ function createEmptyData() {
 function seedStorage() {
   if (!localStorage.getItem(STORAGE_KEY)) {
     saveData(createEmptyData());
+  } else {
+    const current = getData();
+    const migrated = migrateData(current);
+    saveData(migrated);
   }
+}
+
+function migrateData(data) {
+  const base = createEmptyData();
+  return {
+    incomeCategories: data.incomeCategories || base.incomeCategories,
+    expenseCategories: data.expenseCategories || base.expenseCategories,
+    investmentCategories: data.investmentCategories || base.investmentCategories,
+    accounts: Array.isArray(data.accounts) && data.accounts.length ? data.accounts : base.accounts,
+    students: Array.isArray(data.students) ? data.students : [],
+    incomes: Array.isArray(data.incomes) ? data.incomes.map((item) => ({
+      ...item,
+      currency: item.currency || "USD",
+      exchangeRate: item.exchangeRate || 1,
+      originalAmount: item.originalAmount ?? item.amount
+    })) : [],
+    expenses: Array.isArray(data.expenses) ? data.expenses : [],
+    teacherPayments: Array.isArray(data.teacherPayments) ? data.teacherPayments : [],
+    investments: Array.isArray(data.investments) ? data.investments : []
+  };
 }
 
 function initLogin() {
@@ -121,7 +161,7 @@ function bindResetButtons() {
   document.querySelectorAll("[data-reset-demo]").forEach((button) => {
     button.addEventListener("click", () => {
       const confirmed = window.confirm(
-        "Se borrarán todos los ingresos, gastos, pagos, inversiones y saldos guardados. ¿Deseas continuar?"
+        "Se borrarán todos los datos guardados de estudiantes, ingresos, gastos, cuentas, maestros e inversiones. ¿Deseas continuar?"
       );
 
       if (!confirmed) return;
@@ -137,6 +177,7 @@ function bindResetButtons() {
 
 function renderDashboard(data) {
   const metrics = computeMetrics(data);
+  const studentStats = computeStudentStats(data);
 
   setText("metricIngresosMes", formatCurrency(metrics.incomesMonth));
   setText("metricGastosMes", formatCurrency(metrics.expensesMonth));
@@ -144,6 +185,11 @@ function renderDashboard(data) {
   setText("metricCaja", formatCurrency(metrics.cajaTotal));
   setText("heroCaja", formatCurrency(metrics.cajaTotal));
   setText("sidebarCaja", formatCurrency(metrics.cajaTotal));
+
+  setText("dashboardStudentsActive", String(studentStats.active));
+  setText("dashboardStudentsOnTime", String(studentStats.onTime));
+  setText("dashboardStudentsPending", String(studentStats.pending));
+  setText("dashboardStudentsLate", String(studentStats.late));
 
   const movementContainer = document.getElementById("recentMovements");
   const recent = buildRecentMovements(data).slice(0, 6);
@@ -164,23 +210,99 @@ function renderDashboard(data) {
       : emptyMessage("Aún no hay movimientos registrados.");
   }
 
-  const accountsSummary = document.getElementById("accountsSummary");
-  const accountBalances = getAccountBalances(data);
+  const alertsContainer = document.getElementById("studentsAlerts");
+  if (alertsContainer) {
+    const alertItems = studentStats.details
+      .filter((item) => item.statusPayment === "Retrasado" || item.statusPayment === "Pendiente")
+      .slice(0, 5);
 
-  if (accountsSummary) {
-    accountsSummary.innerHTML = accountBalances.length
-      ? accountBalances.map((account) => `
-          <div class="account-mini-item">
-            <div>
-              <strong>${account.name}</strong>
-              <span>${account.type}</span>
-            </div>
-            <div class="${account.current >= 0 ? "amount-positive" : "amount-negative"}">
-              ${formatCurrency(account.current)}
-            </div>
+    alertsContainer.innerHTML = alertItems.length
+      ? alertItems.map((student) => `
+          <div class="mini-stat-card">
+            <span>${student.name}</span>
+            <strong>${student.statusPayment}</strong>
+            <small>Saldo pendiente: ${formatCurrency(student.pendingAmount)}</small>
           </div>
         `).join("")
-      : emptyMessage("No hay cuentas disponibles.");
+      : emptyMessage("No hay alumnos pendientes o retrasados.");
+  }
+}
+
+function renderStudentsPage(data) {
+  const form = document.getElementById("studentForm");
+  if (form) {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const payload = {
+        id: cryptoRandom(),
+        name: form.name.value.trim(),
+        level: form.level.value.trim(),
+        monthlyFee: Number(form.monthlyFee.value),
+        dueDay: Number(form.dueDay.value),
+        status: form.status.value,
+        contact: form.contact.value.trim(),
+        notes: form.notes.value.trim()
+      };
+
+      if (!payload.name || !payload.level || payload.monthlyFee <= 0 || payload.dueDay < 1 || payload.dueDay > 31) {
+        toast("Completa correctamente los datos del estudiante.");
+        return;
+      }
+
+      const exists = data.students.some(
+        (student) => student.name.toLowerCase() === payload.name.toLowerCase()
+      );
+
+      if (exists) {
+        toast("Ya existe un estudiante con ese nombre.");
+        return;
+      }
+
+      data.students.unshift(payload);
+      saveData(data);
+      toast("Estudiante guardado correctamente.");
+      window.location.reload();
+    });
+  }
+
+  const stats = computeStudentStats(data);
+
+  setText("studentsActiveCount", String(stats.active));
+  setText("studentsOnTimeCount", String(stats.onTime));
+  setText("studentsPendingCount", String(stats.pending));
+  setText("studentsLateCount", String(stats.late));
+
+  const summaryCards = document.getElementById("studentsSummaryCards");
+  if (summaryCards) {
+    summaryCards.innerHTML = stats.details.length
+      ? stats.details.slice(0, 5).map((student) => `
+          <div class="mini-stat-card">
+            <span>${student.name}</span>
+            <strong>${student.statusPayment}</strong>
+            <small>Último pago: ${student.lastPayment ? formatDate(student.lastPayment) : "Sin pago"}</small>
+          </div>
+        `).join("")
+      : emptyMessage("Aún no hay estudiantes registrados.");
+  }
+
+  const tableBody = document.getElementById("studentsTableBody");
+  if (tableBody) {
+    tableBody.innerHTML = stats.details.length
+      ? stats.details.map((student) => `
+          <tr>
+            <td>${student.name}</td>
+            <td>${student.level}</td>
+            <td>${formatCurrency(student.monthlyFee)}</td>
+            <td>${student.lastPayment ? formatDate(student.lastPayment) : "Sin pago"}</td>
+            <td>${formatDueDate(student.nextDueDate)}</td>
+            <td>${formatCurrency(student.paidThisMonth)}</td>
+            <td class="${student.pendingAmount > 0 ? "amount-negative" : "amount-positive"}">${formatCurrency(student.pendingAmount)}</td>
+            <td>${student.statusPayment}</td>
+            <td>${student.status}</td>
+          </tr>
+        `).join("")
+      : `<tr><td colspan="9">No hay estudiantes registrados.</td></tr>`;
   }
 }
 
@@ -192,8 +314,34 @@ function renderIncomesPage(data) {
   if (form) {
     form.date.value = todayValue();
 
+    const studentInput = form.querySelector('[name="student"]');
+    if (studentInput) {
+      studentInput.setAttribute(
+        "list",
+        ensureStudentDatalist(data.students)
+      );
+    }
+
     form.addEventListener("submit", (event) => {
       event.preventDefault();
+
+      const currency = form.currency ? form.currency.value : "USD";
+      let exchangeRate = 1;
+
+      if (currency === "NIO") {
+        const rateInput = window.prompt("Ingresa la tasa de conversión C$ por 1 USD:", "36.50");
+        exchangeRate = Number(rateInput);
+
+        if (!exchangeRate || exchangeRate <= 0) {
+          toast("Debes ingresar una tasa válida.");
+          return;
+        }
+      }
+
+      const originalAmount = Number(form.amount.value);
+      const amountUsd = currency === "NIO"
+        ? originalAmount / exchangeRate
+        : originalAmount;
 
       const payload = {
         id: cryptoRandom(),
@@ -203,19 +351,23 @@ function renderIncomesPage(data) {
         concept: form.concept.value.trim(),
         category: form.category.value,
         method: form.method.value,
-        amount: Number(form.amount.value),
+        currency,
+        exchangeRate,
+        originalAmount,
+        amount: amountUsd,
         notes: form.notes.value.trim(),
         account: form.account.value
       };
 
-      if (!payload.date || !payload.student || !payload.level || !payload.concept || payload.amount <= 0) {
+      if (!payload.date || !payload.student || !payload.level || !payload.concept || payload.originalAmount <= 0) {
         toast("Completa correctamente todos los campos del ingreso.");
         return;
       }
 
       data.incomes.unshift(payload);
+      syncIncomeToStudent(data, payload);
       saveData(data);
-      toast("Ingreso guardado correctamente.");
+      toast("Ingreso guardado correctamente en USD.");
       window.location.reload();
     });
   }
@@ -231,11 +383,14 @@ function renderIncomesPage(data) {
             <td>${item.category}</td>
             <td>${item.concept}</td>
             <td>${item.method}</td>
+            <td>${item.currency || "USD"}</td>
+            <td>${formatOriginalCurrency(item.originalAmount ?? item.amount, item.currency || "USD")}</td>
+            <td>${item.currency === "NIO" ? item.exchangeRate : "1.00"}</td>
             <td class="amount-positive">${formatCurrency(item.amount)}</td>
             <td>${item.account}</td>
           </tr>
         `).join("")
-      : `<tr><td colspan="8">No hay ingresos registrados.</td></tr>`;
+      : `<tr><td colspan="11">No hay ingresos registrados.</td></tr>`;
   }
 
   setText("incomeTotalCount", String(data.incomes.length));
@@ -512,11 +667,17 @@ function renderInvestmentsPage(data) {
 
 function renderReportsPage(data) {
   const metrics = computeMetrics(data);
+  const studentStats = computeStudentStats(data);
 
   setText("reportIncome", formatCurrency(metrics.totalIncome));
   setText("reportExpenses", formatCurrency(metrics.totalExpenses));
   setText("reportBalance", formatCurrency(metrics.totalBalance));
   setText("reportCaja", formatCurrency(metrics.cajaTotal));
+
+  setText("reportStudentsActive", String(studentStats.active));
+  setText("reportStudentsOnTime", String(studentStats.onTime));
+  setText("reportStudentsPending", String(studentStats.pending));
+  setText("reportStudentsLate", String(studentStats.late));
 
   const categories = buildCategoryReport(data);
   const categoryBars = document.getElementById("categoryBars");
@@ -553,25 +714,20 @@ function renderReportsPage(data) {
       : emptyMessage("No hay pagos a maestros registrados.");
   }
 
-  const compareMax = Math.max(metrics.totalIncome, metrics.totalExpenses, 1);
-  const comparison = document.getElementById("comparisonBars");
-  if (comparison) {
-    comparison.innerHTML = `
-      <div class="comparison-bar-card">
-        <strong>Ingresos</strong>
-        <div class="bar-track">
-          <div class="bar-fill" style="width:${(metrics.totalIncome / compareMax) * 100}%"></div>
-        </div>
-        <small class="subtle">${formatCurrency(metrics.totalIncome)}</small>
-      </div>
-      <div class="comparison-bar-card">
-        <strong>Egresos</strong>
-        <div class="bar-track">
-          <div class="bar-fill" style="width:${(metrics.totalExpenses / compareMax) * 100}%"></div>
-        </div>
-        <small class="subtle">${formatCurrency(metrics.totalExpenses)}</small>
-      </div>
-    `;
+  const studentCards = document.getElementById("studentStatusCards");
+  if (studentCards) {
+    studentCards.innerHTML = studentStats.details.length
+      ? studentStats.details
+          .filter((student) => student.status === "Activo")
+          .slice(0, 6)
+          .map((student) => `
+            <div class="mini-stat-card">
+              <span>${student.name}</span>
+              <strong>${student.statusPayment}</strong>
+              <small>Saldo pendiente: ${formatCurrency(student.pendingAmount)}</small>
+            </div>
+          `).join("")
+      : emptyMessage("No hay estudiantes registrados.");
   }
 
   const summaryTable = document.getElementById("reportSummaryTable");
@@ -583,101 +739,103 @@ function renderReportsPage(data) {
       <tr><td>Inversiones</td><td>${formatCurrency(sumBy(data.investments, "amount"))}</td></tr>
       <tr><td>Balance general</td><td>${formatCurrency(metrics.totalBalance)}</td></tr>
       <tr><td>Total en caja</td><td>${formatCurrency(metrics.cajaTotal)}</td></tr>
+      <tr><td>Estudiantes activos</td><td>${studentStats.active}</td></tr>
+      <tr><td>Estudiantes al día</td><td>${studentStats.onTime}</td></tr>
+      <tr><td>Estudiantes pendientes</td><td>${studentStats.pending}</td></tr>
+      <tr><td>Estudiantes retrasados</td><td>${studentStats.late}</td></tr>
     `;
   }
 
   const downloadButton = document.getElementById("downloadMonthlyReportBtn");
   if (downloadButton) {
     downloadButton.addEventListener("click", () => {
-      downloadCurrentMonthReport(data);
+      downloadCurrentMonthReport(data, studentStats);
     });
   }
 }
 
-function downloadCurrentMonthReport(data) {
-  const monthInfo = getCurrentMonthInfo();
+function computeStudentStats(data) {
+  const activeStudents = data.students.filter((student) => student.status === "Activo");
 
-  const incomes = data.incomes.filter((item) => isSameMonth(item.date, monthInfo.month, monthInfo.year));
-  const expenses = data.expenses.filter((item) => isSameMonth(item.date, monthInfo.month, monthInfo.year));
-  const teachers = data.teacherPayments.filter((item) => isSameMonth(item.date, monthInfo.month, monthInfo.year));
-  const investments = data.investments.filter((item) => isSameMonth(item.date, monthInfo.month, monthInfo.year));
+  const details = activeStudents.map((student) => {
+    const studentPayments = data.incomes
+      .filter((income) => income.student.toLowerCase() === student.name.toLowerCase())
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const incomeTotal = sumBy(incomes, "amount");
-  const expenseTotal = sumBy(expenses, "amount");
-  const teacherTotal = sumBy(teachers, "amount");
-  const investmentTotal = sumBy(investments, "amount");
-  const totalExpenses = expenseTotal + teacherTotal + investmentTotal;
-  const balance = incomeTotal - totalExpenses;
-  const caja = getAccountBalances(data).reduce((sum, item) => sum + item.current, 0);
+    const lastPayment = studentPayments[0]?.date || null;
+    const paidThisMonth = studentPayments
+      .filter((payment) => isSameMonth(payment.date, currentMonth(), currentYear()))
+      .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 
-  const rows = [
-    ["Reporte mensual", monthInfo.label],
-    ["Ingresos del mes", incomeTotal],
-    ["Gastos del mes", expenseTotal],
-    ["Pagos a maestros del mes", teacherTotal],
-    ["Inversiones del mes", investmentTotal],
-    ["Balance del mes", balance],
-    ["Total en caja actual", caja],
-    [],
-    ["Ingresos"],
-    ["Fecha", "Estudiante", "Nivel", "Concepto", "Categoría", "Método", "Monto", "Cuenta"],
-    ...incomes.map((item) => [
-      item.date,
-      item.student,
-      item.level,
-      item.concept,
-      item.category,
-      item.method,
-      item.amount,
-      item.account
-    ]),
-    [],
-    ["Gastos"],
-    ["Fecha", "Descripción", "Categoría", "Monto", "Cuenta", "Notas"],
-    ...expenses.map((item) => [
-      item.date,
-      item.description,
-      item.category,
-      item.amount,
-      item.account,
-      item.notes
-    ]),
-    [],
-    ["Pagos a maestros"],
-    ["Fecha", "Maestro", "Monto", "Período", "Notas"],
-    ...teachers.map((item) => [
-      item.date,
-      item.teacher,
-      item.amount,
-      item.period,
-      item.notes
-    ]),
-    [],
-    ["Inversiones"],
-    ["Fecha", "Concepto", "Categoría", "Monto", "Cuenta", "Notas"],
-    ...investments.map((item) => [
-      item.date,
-      item.concept,
-      item.category,
-      item.amount,
-      item.account,
-      item.notes
-    ])
-  ];
+    const pendingAmount = Math.max(student.monthlyFee - paidThisMonth, 0);
+    const nextDueDate = buildDueDate(student.dueDay);
 
-  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n");
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
+    let statusPayment = "Pendiente";
+    if (pendingAmount <= 0) {
+      statusPayment = "Al día";
+    } else if (new Date() > nextDueDate) {
+      statusPayment = "Retrasado";
+    }
 
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `reporte_mensual_${monthInfo.year}-${String(monthInfo.month + 1).padStart(2, "0")}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+    return {
+      ...student,
+      lastPayment,
+      paidThisMonth,
+      pendingAmount,
+      nextDueDate,
+      statusPayment
+    };
+  });
 
-  toast("Reporte mensual descargado.");
+  return {
+    active: activeStudents.length,
+    onTime: details.filter((item) => item.statusPayment === "Al día").length,
+    pending: details.filter((item) => item.statusPayment === "Pendiente").length,
+    late: details.filter((item) => item.statusPayment === "Retrasado").length,
+    details: details.sort((a, b) => {
+      const order = { "Retrasado": 0, "Pendiente": 1, "Al día": 2 };
+      return order[a.statusPayment] - order[b.statusPayment];
+    })
+  };
+}
+
+function syncIncomeToStudent(data, income) {
+  const foundStudent = data.students.find(
+    (student) => student.name.toLowerCase() === income.student.toLowerCase()
+  );
+
+  if (!foundStudent) {
+    return;
+  }
+
+  if (!foundStudent.level && income.level) {
+    foundStudent.level = income.level;
+  }
+}
+
+function buildDueDate(dueDay) {
+  const year = currentYear();
+  const month = currentMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const safeDay = Math.min(dueDay, lastDay);
+  return new Date(year, month, safeDay, 23, 59, 59);
+}
+
+function renderTagList(id, items) {
+  const container = document.getElementById(id);
+  if (!container) return;
+  container.innerHTML = items.map((item) => `<div class="tag-item">${capitalize(item)}</div>`).join("");
+}
+
+function fillSelect(id, values) {
+  const select = document.getElementById(id);
+  if (!select) return;
+  select.innerHTML = values.map((value) => `<option value="${value}">${value}</option>`).join("");
+}
+
+function updateSidebarCaja(data) {
+  const metrics = computeMetrics(data);
+  setText("sidebarCaja", formatCurrency(metrics.cajaTotal));
 }
 
 function computeMetrics(data) {
@@ -688,16 +846,17 @@ function computeMetrics(data) {
   const totalExpenses = operationalExpenses + teacherExpenses + investmentExpenses;
   const totalBalance = totalIncome - totalExpenses;
 
-  const monthInfo = getCurrentMonthInfo();
+  const month = currentMonth();
+  const year = currentYear();
 
   const incomesMonth = data.incomes
-    .filter((item) => isSameMonth(item.date, monthInfo.month, monthInfo.year))
-    .reduce((sum, item) => sum + item.amount, 0);
+    .filter((item) => isSameMonth(item.date, month, year))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
   const expensesMonth =
-    data.expenses.filter((item) => isSameMonth(item.date, monthInfo.month, monthInfo.year)).reduce((sum, item) => sum + item.amount, 0) +
-    data.teacherPayments.filter((item) => isSameMonth(item.date, monthInfo.month, monthInfo.year)).reduce((sum, item) => sum + item.amount, 0) +
-    data.investments.filter((item) => isSameMonth(item.date, monthInfo.month, monthInfo.year)).reduce((sum, item) => sum + item.amount, 0);
+    data.expenses.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0) +
+    data.teacherPayments.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0) +
+    data.investments.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
   const balanceMonth = incomesMonth - expensesMonth;
   const cajaTotal = getAccountBalances(data).reduce((sum, item) => sum + item.current, 0);
@@ -717,21 +876,21 @@ function getAccountBalances(data) {
   return data.accounts.map((account) => {
     const incomeTotal = data.incomes
       .filter((item) => item.account === account.name)
-      .reduce((sum, item) => sum + item.amount, 0);
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
     const expenseTotal = data.expenses
       .filter((item) => item.account === account.name)
-      .reduce((sum, item) => sum + item.amount, 0);
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
     const investmentTotal = data.investments
       .filter((item) => item.account === account.name)
-      .reduce((sum, item) => sum + item.amount, 0);
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-    const teacherTotal = account.name === "Cuenta en banco principal"
+    const teacherTotal = account.name === "Banco USD"
       ? sumBy(data.teacherPayments, "amount")
       : 0;
 
-    const current = account.initialBalance + incomeTotal - expenseTotal - investmentTotal - teacherTotal;
+    const current = Number(account.initialBalance || 0) + incomeTotal - expenseTotal - investmentTotal - teacherTotal;
 
     return { ...account, current };
   });
@@ -776,8 +935,8 @@ function buildRecentMovements(data) {
 
 function buildCategoryReport(data) {
   const map = {};
-  data.expenses.forEach((item) => addToMap(map, `Gasto: ${capitalize(item.category)}`, item.amount));
-  data.investments.forEach((item) => addToMap(map, `Inversión: ${capitalize(item.category)}`, item.amount));
+  data.expenses.forEach((item) => addToMap(map, `Gasto: ${capitalize(item.category)}`, Number(item.amount || 0)));
+  data.investments.forEach((item) => addToMap(map, `Inversión: ${capitalize(item.category)}`, Number(item.amount || 0)));
   addToMap(map, "Pagos a maestros", sumBy(data.teacherPayments, "amount"));
 
   return Object.entries(map)
@@ -787,7 +946,7 @@ function buildCategoryReport(data) {
 
 function summarizeBy(list, field) {
   return list.reduce((acc, item) => {
-    acc[item[field]] = (acc[item[field]] || 0) + item.amount;
+    acc[item[field]] = (acc[item[field]] || 0) + Number(item.amount || 0);
     return acc;
   }, {});
 }
@@ -796,28 +955,140 @@ function topCategory(list, field) {
   if (!list.length) return "Sin datos";
 
   const summary = list.reduce((acc, item) => {
-    acc[item[field]] = (acc[item[field]] || 0) + item.amount;
+    acc[item[field]] = (acc[item[field]] || 0) + Number(item.amount || 0);
     return acc;
   }, {});
 
   return Object.entries(summary).sort((a, b) => b[1] - a[1])[0][0];
 }
 
-function renderTagList(id, items) {
-  const container = document.getElementById(id);
-  if (!container) return;
-  container.innerHTML = items.map((item) => `<div class="tag-item">${capitalize(item)}</div>`).join("");
+function downloadCurrentMonthReport(data, studentStats) {
+  const month = currentMonth();
+  const year = currentYear();
+  const monthLabel = new Date(year, month, 1).toLocaleDateString("es-MX", {
+    month: "long",
+    year: "numeric"
+  });
+
+  const incomes = data.incomes.filter((item) => isSameMonth(item.date, month, year));
+  const expenses = data.expenses.filter((item) => isSameMonth(item.date, month, year));
+  const teachers = data.teacherPayments.filter((item) => isSameMonth(item.date, month, year));
+  const investments = data.investments.filter((item) => isSameMonth(item.date, month, year));
+
+  const incomeTotal = sumBy(incomes, "amount");
+  const expenseTotal = sumBy(expenses, "amount");
+  const teacherTotal = sumBy(teachers, "amount");
+  const investmentTotal = sumBy(investments, "amount");
+  const totalExpenses = expenseTotal + teacherTotal + investmentTotal;
+  const balance = incomeTotal - totalExpenses;
+  const caja = getAccountBalances(data).reduce((sum, item) => sum + item.current, 0);
+
+  const rows = [
+    ["Reporte mensual", monthLabel],
+    ["Ingresos del mes", incomeTotal],
+    ["Gastos del mes", expenseTotal],
+    ["Pagos a maestros del mes", teacherTotal],
+    ["Inversiones del mes", investmentTotal],
+    ["Balance del mes", balance],
+    ["Total en caja actual", caja],
+    ["Estudiantes activos", studentStats.active],
+    ["Estudiantes al día", studentStats.onTime],
+    ["Estudiantes pendientes", studentStats.pending],
+    ["Estudiantes retrasados", studentStats.late],
+    [],
+    ["Estudiantes"],
+    ["Nombre", "Nivel", "Mensualidad", "Último pago", "Próximo vencimiento", "Pagado este mes", "Pendiente", "Estado"],
+    ...studentStats.details.map((student) => [
+      student.name,
+      student.level,
+      student.monthlyFee,
+      student.lastPayment || "",
+      formatDueDate(student.nextDueDate),
+      student.paidThisMonth,
+      student.pendingAmount,
+      student.statusPayment
+    ]),
+    [],
+    ["Ingresos"],
+    ["Fecha", "Estudiante", "Nivel", "Concepto", "Categoría", "Método", "Moneda", "Monto original", "Tasa", "Monto USD", "Cuenta"],
+    ...incomes.map((item) => [
+      item.date,
+      item.student,
+      item.level,
+      item.concept,
+      item.category,
+      item.method,
+      item.currency || "USD",
+      item.originalAmount ?? item.amount,
+      item.exchangeRate || 1,
+      item.amount,
+      item.account
+    ]),
+    [],
+    ["Gastos"],
+    ["Fecha", "Descripción", "Categoría", "Monto", "Cuenta", "Notas"],
+    ...expenses.map((item) => [
+      item.date,
+      item.description,
+      item.category,
+      item.amount,
+      item.account,
+      item.notes || ""
+    ]),
+    [],
+    ["Pagos a maestros"],
+    ["Fecha", "Maestro", "Monto", "Período", "Notas"],
+    ...teachers.map((item) => [
+      item.date,
+      item.teacher,
+      item.amount,
+      item.period,
+      item.notes || ""
+    ]),
+    [],
+    ["Inversiones"],
+    ["Fecha", "Concepto", "Categoría", "Monto", "Cuenta", "Notas"],
+    ...investments.map((item) => [
+      item.date,
+      item.concept,
+      item.category,
+      item.amount,
+      item.account,
+      item.notes || ""
+    ])
+  ];
+
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `reporte_mensual_${year}-${String(month + 1).padStart(2, "0")}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+
+  toast("Reporte mensual descargado.");
 }
 
-function fillSelect(id, values) {
-  const select = document.getElementById(id);
-  if (!select) return;
-  select.innerHTML = values.map((value) => `<option value="${value}">${value}</option>`).join("");
-}
+function ensureStudentDatalist(students) {
+  const id = "studentsDatalist";
+  let datalist = document.getElementById(id);
 
-function updateSidebarCaja(data) {
-  const metrics = computeMetrics(data);
-  setText("sidebarCaja", formatCurrency(metrics.cajaTotal));
+  if (!datalist) {
+    datalist = document.createElement("datalist");
+    datalist.id = id;
+    document.body.appendChild(datalist);
+  }
+
+  datalist.innerHTML = students
+    .filter((student) => student.status === "Activo")
+    .map((student) => `<option value="${student.name}"></option>`)
+    .join("");
+
+  return id;
 }
 
 function setText(id, value) {
@@ -838,16 +1109,37 @@ function sumBy(list, field) {
 }
 
 function formatCurrency(value) {
-  return new Intl.NumberFormat("es-MX", {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "MXN",
+    currency: "USD",
     maximumFractionDigits: 2
   }).format(Number(value || 0));
+}
+
+function formatOriginalCurrency(value, currency) {
+  if (currency === "NIO") {
+    return new Intl.NumberFormat("es-NI", {
+      style: "currency",
+      currency: "NIO",
+      maximumFractionDigits: 2
+    }).format(Number(value || 0));
+  }
+
+  return formatCurrency(value);
 }
 
 function formatDate(dateString) {
   if (!dateString) return "-";
   return new Date(`${dateString}T00:00:00`).toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  });
+}
+
+function formatDueDate(date) {
+  if (!date) return "-";
+  return date.toLocaleDateString("es-MX", {
     day: "2-digit",
     month: "short",
     year: "numeric"
@@ -862,12 +1154,12 @@ function todayValue() {
   return `${year}-${month}-${day}`;
 }
 
-function getCurrentMonthInfo() {
-  const now = new Date();
-  const month = now.getMonth();
-  const year = now.getFullYear();
-  const label = now.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
-  return { month, year, label };
+function currentMonth() {
+  return new Date().getMonth();
+}
+
+function currentYear() {
+  return new Date().getFullYear();
 }
 
 function isSameMonth(dateString, month, year) {
@@ -881,7 +1173,7 @@ function capitalize(text) {
 }
 
 function addToMap(map, key, value) {
-  map[key] = (map[key] || 0) + value;
+  map[key] = (map[key] || 0) + Number(value || 0);
 }
 
 function csvEscape(value) {
