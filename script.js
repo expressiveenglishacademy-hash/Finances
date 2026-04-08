@@ -126,7 +126,8 @@ function seedStorage() {
 }
 
 function getData() {
-  return JSON.parse(localStorage.getItem(STORAGE_KEY)) || createEmptyData();
+  return JSON.parse(localStorage.getItem("eea_finances_app_v3"))
+;
 }
 
 function saveData(data) {
