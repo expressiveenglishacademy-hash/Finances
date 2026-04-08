@@ -19,6 +19,7 @@
 
       <nav class="sidebar-nav">
         <a href="index.html" class="nav-link">Inicio / Dashboard</a>
+        <a href="estudiantes.html" class="nav-link">Estudiantes</a>
         <a href="ingresos.html" class="nav-link active">Ingresos</a>
         <a href="gastos.html" class="nav-link">Gastos</a>
         <a href="cuentas.html" class="nav-link">Cuentas</a>
@@ -29,7 +30,7 @@
 
       <div class="sidebar-footer glass-card">
         <span class="eyebrow">Consejo</span>
-        <p>Registra siempre estudiante, nivel y cuenta destino para mantener trazabilidad.</p>
+        <p>Registra estudiante, nivel, moneda y cuenta destino para mantener una trazabilidad clara.</p>
       </div>
     </aside>
 
@@ -39,12 +40,11 @@
           <span class="eyebrow">Control detallado</span>
           <h1>Ingresos</h1>
         </div>
-      <div class="topbar-actions">
-  <span class="status-pill">Modo oscuro activo</span>
-  <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
-  <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
-</div>
-
+        <div class="topbar-actions">
+          <span class="status-pill">Mensualidades activas</span>
+          <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
+          <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
+        </div>
       </header>
 
       <main class="content-grid">
@@ -94,6 +94,14 @@
               </label>
 
               <label class="field">
+                <span>Moneda</span>
+                <select name="currency" id="incomeCurrency" required>
+                  <option value="USD">USD</option>
+                  <option value="NIO">Córdobas (C$)</option>
+                </select>
+              </label>
+
+              <label class="field">
                 <span>Monto</span>
                 <input type="number" step="0.01" min="0" name="amount" placeholder="0.00" required />
               </label>
@@ -126,7 +134,7 @@
                 <strong id="incomeTotalCount">0</strong>
               </div>
               <div class="mini-stat-card">
-                <span>Total acumulado</span>
+                <span>Total acumulado en USD</span>
                 <strong id="incomeTotalAmount">$0</strong>
               </div>
               <div class="mini-stat-card">
@@ -155,7 +163,10 @@
                   <th>Categoría</th>
                   <th>Concepto</th>
                   <th>Método</th>
-                  <th>Monto</th>
+                  <th>Moneda</th>
+                  <th>Monto original</th>
+                  <th>Tasa</th>
+                  <th>Monto USD</th>
                   <th>Cuenta destino</th>
                 </tr>
               </thead>
