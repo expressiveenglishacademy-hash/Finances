@@ -293,6 +293,11 @@ textarea {
   padding-block: 15px;
 }
 
+.btn-sm {
+  padding: 8px 12px;
+  font-size: 0.88rem;
+}
+
 .content-grid {
   display: grid;
   gap: 20px;
@@ -501,13 +506,39 @@ input,
 select,
 textarea {
   width: 100%;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--line);
+  background-color: rgba(255, 255, 255, 0.04);
   color: var(--text);
+  border: 1px solid var(--line);
   border-radius: 14px;
   padding: 13px 14px;
   outline: none;
   transition: var(--transition);
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-soft) 50%),
+    linear-gradient(135deg, var(--text-soft) 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) calc(50% - 4px),
+    calc(100% - 14px) calc(50% - 4px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 42px;
+}
+
+select option {
+  background-color: #12243b;
+  color: #f7fbff;
+}
+
+select option:checked,
+select option:hover {
+  background: #1e4f92;
+  color: #ffffff;
 }
 
 textarea {
