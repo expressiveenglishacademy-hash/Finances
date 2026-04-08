@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inversiones | Expressive English Academy Finances</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="inversiones">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a href="index.html" class="brand-block">
+        <div class="brand-mark">EE</div>
+        <div>
+          <strong>Expressive English</strong>
+          <span>Academy Finances</span>
+        </div>
+      </a>
+
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-link">Inicio / Dashboard</a>
+        <a href="ingresos.html" class="nav-link">Ingresos</a>
+        <a href="gastos.html" class="nav-link">Gastos</a>
+        <a href="cuentas.html" class="nav-link">Cuentas</a>
+        <a href="maestros.html" class="nav-link">Pago de maestros</a>
+        <a href="inversiones.html" class="nav-link active">Inversiones</a>
+        <a href="reportes.html" class="nav-link">Reportes</a>
+      </nav>
+
+      <div class="sidebar-footer glass-card">
+        <span class="eyebrow">Enfoque</span>
+        <p>Registra aquí mejoras, equipo y gastos estratégicos de crecimiento.</p>
+      </div>
+    </aside>
+
+    <div class="main-layout">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow">Crecimiento</span>
+          <h1>Inversiones</h1>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
+        </div>
+      </header>
+
+      <main class="content-grid">
+        <section class="three-column">
+          <article class="glass-card">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Nueva inversión</span>
+                <h2>Registrar inversión</h2>
+              </div>
+            </div>
+
+            <form id="investmentForm" class="form-grid">
+              <label class="field">
+                <span>Fecha</span>
+                <input type="date" name="date" required />
+              </label>
+
+              <label class="field">
+                <span>Concepto</span>
+                <input type="text" name="concept" placeholder="Nuevo proyector para aula" required />
+              </label>
+
+              <label class="field">
+                <span>Categoría</span>
+                <select name="category" id="investmentCategorySelect"></select>
+              </label>
+
+              <label class="field">
+                <span>Monto</span>
+                <input type="number" step="0.01" min="0" name="amount" required />
+              </label>
+
+              <label class="field">
+                <span>Cuenta de salida</span>
+                <select name="account" id="investmentAccountSelect"></select>
+              </label>
+
+              <label class="field field-full">
+                <span>Notas</span>
+                <textarea name="notes" placeholder="Detalle adicional"></textarea>
+              </label>
+
+              <button type="submit" class="btn btn-primary">Guardar inversión</button>
+            </form>
+          </article>
+
+          <article class="glass-card">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Gestor visual</span>
+                <h2>Categorías</h2>
+              </div>
+            </div>
+
+            <form id="investmentCategoryForm" class="inline-form">
+              <input type="text" name="categoryName" placeholder="Nueva categoría" required />
+              <button type="submit" class="btn btn-secondary">Agregar</button>
+            </form>
+
+            <div id="investmentCategoriesList" class="tag-list"></div>
+          </article>
+
+          <article class="glass-card">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Resumen</span>
+                <h2>Vista rápida</h2>
+              </div>
+            </div>
+
+            <div class="stack-cards">
+              <div class="mini-stat-card">
+                <span>Total invertido</span>
+                <strong id="investmentTotalAmount">$0</strong>
+              </div>
+              <div class="mini-stat-card">
+                <span>Registros</span>
+                <strong id="investmentTotalCount">0</strong>
+              </div>
+              <div class="mini-stat-card">
+                <span>Última inversión</span>
+                <strong id="investmentLastItem">Sin datos</strong>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="glass-card">
+          <div class="panel-header">
+            <div>
+              <span class="eyebrow">Historial</span>
+              <h2>Inversiones registradas</h2>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Concepto</th>
+                  <th>Categoría</th>
+                  <th>Monto</th>
+                  <th>Cuenta de salida</th>
+                  <th>Notas</th>
+                </tr>
+              </thead>
+              <tbody id="investmentTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
