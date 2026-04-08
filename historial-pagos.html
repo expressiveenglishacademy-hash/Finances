@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Historial de Pagos | Expressive English Academy Finances</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="historial">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a href="index.html" class="brand-block">
+        <div class="brand-mark">EE</div>
+        <div>
+          <strong>Expressive English</strong>
+          <span>Academy Finances</span>
+        </div>
+      </a>
+
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-link">Inicio / Dashboard</a>
+        <a href="estudiantes.html" class="nav-link">Estudiantes</a>
+        <a href="ingresos.html" class="nav-link">Ingresos</a>
+        <a href="historial-pagos.html" class="nav-link active">Historial de pagos</a>
+        <a href="gastos.html" class="nav-link">Gastos</a>
+        <a href="cuentas.html" class="nav-link">Cuentas</a>
+        <a href="maestros.html" class="nav-link">Pago de maestros</a>
+        <a href="inversiones.html" class="nav-link">Inversiones</a>
+        <a href="reportes.html" class="nav-link">Reportes</a>
+      </nav>
+
+      <div class="sidebar-footer glass-card">
+        <span class="eyebrow">Recibos</span>
+        <p>Desde aquí puedes revisar pagos y generar recibos PDF elegantes para enviar a los padres.</p>
+      </div>
+    </aside>
+
+    <div class="main-layout">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow">Seguimiento</span>
+          <h1>Historial de pagos</h1>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
+          <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
+        </div>
+      </header>
+
+      <main class="content-grid">
+        <section class="metrics-grid">
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Pagos registrados</span>
+            <h3 id="historyTotalCount">0</h3>
+            <p>Total de pagos guardados en el sistema.</p>
+          </article>
+
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Total recibido</span>
+            <h3 id="historyTotalAmount">$0</h3>
+            <p>Suma acumulada de todos los ingresos en USD.</p>
+          </article>
+
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Último pago</span>
+            <h3 id="historyLastDate">-</h3>
+            <p>Fecha más reciente registrada.</p>
+          </article>
+
+          <article class="metric-card glass-card highlight-card">
+            <span class="eyebrow">Recibos listos</span>
+            <h3 id="historyReceiptCount">0</h3>
+            <p>Cada pago puede convertirse en un recibo PDF.</p>
+          </article>
+        </section>
+
+        <section class="glass-card">
+          <div class="panel-header">
+            <div>
+              <span class="eyebrow">Filtro</span>
+              <h2>Buscar pagos</h2>
+            </div>
+          </div>
+
+          <form id="paymentHistoryFilterForm" class="form-grid">
+            <label class="field">
+              <span>Buscar estudiante</span>
+              <input type="text" id="paymentHistorySearch" placeholder="Ej. José Esteban" />
+            </label>
+
+            <label class="field">
+              <span>Moneda</span>
+              <select id="paymentHistoryCurrency">
+                <option value="all">Todas</option>
+                <option value="USD">USD</option>
+                <option value="NIO">C$</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Orden</span>
+              <select id="paymentHistoryOrder">
+                <option value="desc">Más recientes primero</option>
+                <option value="asc">Más antiguos primero</option>
+              </select>
+            </label>
+          </form>
+        </section>
+
+        <section class="glass-card">
+          <div class="panel-header">
+            <div>
+              <span class="eyebrow">Listado</span>
+              <h2>Historial de pagos</h2>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Estudiante</th>
+                  <th>Nivel</th>
+                  <th>Concepto</th>
+                  <th>Método</th>
+                  <th>Moneda</th>
+                  <th>Monto original</th>
+                  <th>Monto USD</th>
+                  <th>Cuenta</th>
+                  <th>Recibo</th>
+                </tr>
+              </thead>
+              <tbody id="paymentHistoryTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
