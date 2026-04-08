@@ -26,6 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
     dashboard: () => renderDashboard(data),
     estudiantes: () => renderStudentsPage(data),
     ingresos: () => renderIncomesPage(data),
+    historial: () => renderPaymentHistoryPage(data),
     gastos: () => renderExpensesPage(data),
     cuentas: () => renderAccountsPage(data),
     maestros: () => renderTeachersPage(data),
@@ -94,12 +95,20 @@ function createEmptyData() {
 
 function seedStorage() {
   const current = localStorage.getItem(STORAGE_KEY);
+  const v2 = localStorage.getItem("eea_finances_demo_v2");
+  const v1 = localStorage.getItem("eea_finances_demo_v1");
+
   if (!current) {
-    saveData(createEmptyData());
-    return;
+    if (v2) {
+      localStorage.setItem(STORAGE_KEY, v2);
+    } else if (v1) {
+      localStorage.setItem(STORAGE_KEY, v1);
+    } else {
+      saveData(createEmptyData());
+    }
   }
 
-  const parsed = JSON.parse(current);
+  const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") || createEmptyData();
   const base = createEmptyData();
 
   const merged = {
@@ -126,14 +135,11 @@ function seedStorage() {
 }
 
 function getData() {
-  return JSON.parse(localStorage.getItem("eea_finances_app_v3"))
-;
+  return JSON.parse(localStorage.getItem(STORAGE_KEY)) || createEmptyData();
 }
 
 function saveData(data) {
- localStorage.setItem("eea_finances_app_v4", localStorage.getItem("eea_finances_demo_v2"));
-location.reload();
-;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
 function initLogin() {
@@ -408,12 +414,82 @@ function renderIncomesPage(data) {
   setText("incomeLastStudent", data.incomes[0]?.student || "Sin datos");
 }
 
+function renderPaymentHistoryPage(data) {
+  const searchInput = document.getElementById("paymentHistorySearch");
+  const currencySelect = document.getElementById("paymentHistoryCurrency");
+  const orderSelect = document.getElementById("paymentHistoryOrder");
+  const tableBody = document.getElementById("paymentHistoryTableBody");
+
+  const renderRows = () => {
+    let items = [...data.incomes];
+
+    const search = (searchInput?.value || "").trim().toLowerCase();
+    const currency = currencySelect?.value || "all";
+    const order = orderSelect?.value || "desc";
+
+    if (search) {
+      items = items.filter((item) =>
+        item.student.toLowerCase().includes(search) ||
+        item.level.toLowerCase().includes(search) ||
+        item.concept.toLowerCase().includes(search)
+      );
+    }
+
+    if (currency !== "all") {
+      items = items.filter((item) => (item.currency || "USD") === currency);
+    }
+
+    items.sort((a, b) => {
+      if (order === "asc") return new Date(a.date) - new Date(b.date);
+      return new Date(b.date) - new Date(a.date);
+    });
+
+    if (tableBody) {
+      tableBody.innerHTML = items.length
+        ? items.map((item) => `
+          <tr>
+            <td>${formatDate(item.date)}</td>
+            <td>${item.student}</td>
+            <td>${item.receiptLevel || item.level || "-"}</td>
+            <td>${item.concept}</td>
+            <td>${item.method}</td>
+            <td>${item.currency || "USD"}</td>
+            <td>${formatOriginalCurrency(item.originalAmount ?? item.amount, item.currency || "USD")}</td>
+            <td class="amount-positive">${formatCurrency(item.amount)}</td>
+            <td>${item.account}</td>
+            <td>
+              <button class="btn btn-secondary btn-sm" data-receipt-id="${item.id}">
+                Generar recibo
+              </button>
+            </td>
+          </tr>
+        `).join("")
+        : `<tr><td colspan="10">No se encontraron pagos.</td></tr>`;
+    }
+
+    bindReceiptButtons(data);
+  };
+
+  setText("historyTotalCount", String(data.incomes.length));
+  setText("historyTotalAmount", formatCurrency(sumBy(data.incomes, "amount")));
+  setText("historyLastDate", data.incomes[0]?.date ? formatDate(data.incomes[0].date) : "-");
+  setText("historyReceiptCount", String(data.incomes.length));
+
+  [searchInput, currencySelect, orderSelect].forEach((element) => {
+    if (!element) return;
+    element.addEventListener("input", renderRows);
+    element.addEventListener("change", renderRows);
+  });
+
+  renderRows();
+}
+
 function bindReceiptButtons(data) {
   document.querySelectorAll("[data-receipt-id]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.onclick = () => {
       const id = button.getAttribute("data-receipt-id");
       generateReceiptPDF(data, id);
-    });
+    };
   });
 }
 
