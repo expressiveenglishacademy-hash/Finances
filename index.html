@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard | Expressive English Academy Finances</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="dashboard">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a href="index.html" class="brand-block active">
+        <div class="brand-mark">EE</div>
+        <div>
+          <strong>Expressive English</strong>
+          <span>Academy Finances</span>
+        </div>
+      </a>
+
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-link active">Inicio / Dashboard</a>
+        <a href="ingresos.html" class="nav-link">Ingresos</a>
+        <a href="gastos.html" class="nav-link">Gastos</a>
+        <a href="cuentas.html" class="nav-link">Cuentas</a>
+        <a href="maestros.html" class="nav-link">Pago de maestros</a>
+        <a href="inversiones.html" class="nav-link">Inversiones</a>
+        <a href="reportes.html" class="nav-link">Reportes</a>
+      </nav>
+
+      <div class="sidebar-footer glass-card">
+        <span class="eyebrow">Estado financiero</span>
+        <strong id="sidebarCaja">$0</strong>
+        <p>Total disponible actual en caja.</p>
+      </div>
+    </aside>
+
+    <div class="main-layout">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow">Resumen general</span>
+          <h1>Dashboard financiero</h1>
+        </div>
+
+        <div class="topbar-actions">
+          <span class="status-pill">Modo oscuro activo</span>
+          <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
+        </div>
+      </header>
+
+      <main class="content-grid">
+        <section class="hero-panel glass-card">
+          <div>
+            <span class="eyebrow">Vista principal</span>
+            <h2>Control diario con foco en caja, balance y movimientos</h2>
+            <p>
+              Supervisa el desempeño financiero de la academia en una vista clara,
+              moderna y lista para uso personal.
+            </p>
+          </div>
+          <div class="hero-badge">
+            <span>CAJA DISPONIBLE</span>
+            <strong id="heroCaja">$0</strong>
+            <small>Después de todas las deducciones</small>
+          </div>
+        </section>
+
+        <section class="metrics-grid">
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Ingresos del mes</span>
+            <h3 id="metricIngresosMes">$0</h3>
+            <p>Mensualidades registradas en el período actual.</p>
+          </article>
+
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Gastos del mes</span>
+            <h3 id="metricGastosMes">$0</h3>
+            <p>Incluye gastos, pagos a maestros e inversiones.</p>
+          </article>
+
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Balance</span>
+            <h3 id="metricBalance">$0</h3>
+            <p>Diferencia entre ingresos y egresos del mes.</p>
+          </article>
+
+          <article class="metric-card glass-card highlight-card">
+            <span class="eyebrow">Total en caja</span>
+            <h3 id="metricCaja">$0</h3>
+            <p>Disponible final después de deducciones.</p>
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="glass-card">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Movimientos recientes</span>
+                <h2>Actividad financiera</h2>
+              </div>
+              <a href="reportes.html" class="text-link">Ver reportes</a>
+            </div>
+            <div id="recentMovements" class="movement-list"></div>
+          </article>
+
+          <article class="glass-card">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Cuentas</span>
+                <h2>Resumen rápido</h2>
+              </div>
+              <a href="cuentas.html" class="text-link">Administrar</a>
+            </div>
+            <div id="accountsSummary" class="account-mini-list"></div>
+          </article>
+        </section>
+
+        <section class="glass-card">
+          <div class="panel-header">
+            <div>
+              <span class="eyebrow">Accesos rápidos</span>
+              <h2>Módulos principales</h2>
+            </div>
+          </div>
+
+          <div class="quick-links-grid">
+            <a class="quick-link-card" href="ingresos.html">
+              <strong>Ingresos</strong>
+              <span>Registrar mensualidades y pagos recibidos.</span>
+            </a>
+            <a class="quick-link-card" href="gastos.html">
+              <strong>Gastos</strong>
+              <span>Controlar egresos operativos de la academia.</span>
+            </a>
+            <a class="quick-link-card" href="maestros.html">
+              <strong>Pago de maestros</strong>
+              <span>Monitorear historial y resumen por docente.</span>
+            </a>
+            <a class="quick-link-card" href="inversiones.html">
+              <strong>Inversiones</strong>
+              <span>Registrar mejoras y crecimiento del proyecto.</span>
+            </a>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
