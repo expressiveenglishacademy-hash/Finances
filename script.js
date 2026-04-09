@@ -87,6 +87,7 @@ function createEmptyData() {
       }
     ],
     students: [],
+    teachers: [],
     incomes: [],
     expenses: [],
     teacherPayments: [],
@@ -118,13 +119,14 @@ function seedStorage() {
     investmentCategories: Array.isArray(parsed.investmentCategories) ? parsed.investmentCategories : base.investmentCategories,
     accounts: Array.isArray(parsed.accounts) && parsed.accounts.length ? parsed.accounts : base.accounts,
     students: Array.isArray(parsed.students) ? parsed.students : [],
+    teachers: normalizeTeachers(Array.isArray(parsed.teachers) ? parsed.teachers : []),
     incomes: normalizeLegacyTimestamps(
       Array.isArray(parsed.incomes) ? parsed.incomes : [],
       "income"
     ).map((item) => ({
       ...item,
       currency: item.currency || "USD",
-      exchangeRate: item.exchangeRate || 1,
+      exchangeRate: Number(item.exchangeRate || 1),
       originalAmount: item.originalAmount ?? item.amount,
       receiptLevel: item.receiptLevel || item.level || ""
     })),
@@ -135,7 +137,17 @@ function seedStorage() {
     teacherPayments: normalizeLegacyTimestamps(
       Array.isArray(parsed.teacherPayments) ? parsed.teacherPayments : [],
       "teacher"
-    ),
+    ).map((item) => ({
+      ...item,
+      subcategory: item.subcategory || "Horas laborales regulares",
+      currency: item.currency || "USD",
+      exchangeRate: Number(item.exchangeRate || 1),
+      originalAmount: item.originalAmount ?? item.amount,
+      description: item.description || buildTeacherPaymentDescription(
+        item.teacher,
+        item.subcategory || "Horas laborales regulares"
+      )
+    })),
     investments: normalizeLegacyTimestamps(
       Array.isArray(parsed.investments) ? parsed.investments : [],
       "investment"
@@ -143,6 +155,17 @@ function seedStorage() {
   };
 
   saveData(merged);
+}
+
+function normalizeTeachers(list) {
+  return list.map((item) => ({
+    id: item.id || cryptoRandom(),
+    name: item.name || "",
+    contact: item.contact || "",
+    status: item.status || "Activo",
+    notes: item.notes || "",
+    createdAt: item.createdAt || new Date().toISOString()
+  }));
 }
 
 function normalizeLegacyTimestamps(list, type) {
@@ -815,7 +838,7 @@ function generateReceiptPDF(data, incomeId) {
       <div class="receipt-sheet">
         <div class="receipt-top">
           <div class="brand">
-            <img src="${academyLogo}" alt="Logo Academia" />
+            <img src="foto8.jpg.jpg" alt="Logo Academia" />
             <div>
               <h1>Expressive English Academy</h1>
               <p>Recibo de pago</p>
@@ -1048,34 +1071,150 @@ function renderAccountsPage(data) {
 }
 
 function renderTeachersPage(data) {
+  ensureTeacherCatalog(data);
+
   const form = document.getElementById("teacherForm");
-  if (!form) return;
+  const teacherSelect = document.getElementById("teacherSelect");
+  const subcategorySelect = document.getElementById("teacherSubcategorySelect");
+  const descriptionPreview = document.getElementById("teacherDescriptionPreview");
+  const openModalButtons = [
+    document.getElementById("openTeacherModalBtn"),
+    document.getElementById("openTeacherModalInlineBtn")
+  ].filter(Boolean);
+  const teacherModal = document.getElementById("teacherModal");
+  const closeTeacherModalBtn = document.getElementById("closeTeacherModalBtn");
+  const teacherProfileForm = document.getElementById("teacherProfileForm");
 
-  form.date.value = todayValue();
+  fillTeacherSelect(teacherSelect, data.teachers);
+  updateTeacherDescriptionPreview();
 
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-
-    const payload = {
-      id: cryptoRandom(),
-      teacher: form.elements["teacher"].value.trim(),
-      date: form.elements["date"].value,
-      createdAt: new Date().toISOString(),
-      amount: Number(form.elements["amount"].value),
-      period: form.elements["period"].value.trim(),
-      notes: form.elements["notes"].value.trim()
-    };
-
-    if (!payload.teacher || !payload.date || payload.amount <= 0 || !payload.period) {
-      toast("Completa correctamente todos los campos del pago.");
-      return;
-    }
-
-    data.teacherPayments.unshift(payload);
-    saveData(data);
-    toast("Pago registrado correctamente.");
-    setTimeout(() => window.location.reload(), 300);
+  openModalButtons.forEach((button) => {
+    button.addEventListener("click", () => openTeacherModal(teacherModal, teacherProfileForm));
   });
+
+  if (closeTeacherModalBtn) {
+    closeTeacherModalBtn.addEventListener("click", () => closeTeacherModal(teacherModal, teacherProfileForm));
+  }
+
+  if (teacherModal) {
+    teacherModal.addEventListener("click", (event) => {
+      if (event.target === teacherModal) {
+        closeTeacherModal(teacherModal, teacherProfileForm);
+      }
+    });
+  }
+
+  if (teacherSelect) {
+    teacherSelect.addEventListener("change", updateTeacherDescriptionPreview);
+  }
+
+  if (subcategorySelect) {
+    subcategorySelect.addEventListener("change", updateTeacherDescriptionPreview);
+  }
+
+  if (teacherProfileForm) {
+    teacherProfileForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const payload = {
+        id: cryptoRandom(),
+        name: teacherProfileForm.elements["name"].value.trim(),
+        contact: teacherProfileForm.elements["contact"].value.trim(),
+        status: teacherProfileForm.elements["status"].value,
+        notes: teacherProfileForm.elements["notes"].value.trim(),
+        createdAt: new Date().toISOString()
+      };
+
+      if (!payload.name) {
+        toast("Ingresa el nombre del maestro.");
+        return;
+      }
+
+      const exists = data.teachers.some(
+        (teacher) => teacher.name.toLowerCase() === payload.name.toLowerCase()
+      );
+
+      if (exists) {
+        toast("Ya existe un maestro con ese nombre.");
+        return;
+      }
+
+      data.teachers.unshift(payload);
+      saveData(data);
+      fillTeacherSelect(teacherSelect, data.teachers);
+      if (teacherSelect) teacherSelect.value = payload.name;
+      updateTeacherDescriptionPreview();
+      closeTeacherModal(teacherModal, teacherProfileForm);
+      toast("Maestro registrado correctamente.");
+      renderTeacherSummary(data);
+    });
+  }
+
+  if (form) {
+    form.date.value = todayValue();
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const teacher = form.elements["teacher"].value.trim();
+      const subcategory = form.elements["subcategory"].value;
+      const currency = form.elements["currency"].value;
+
+      let exchangeRate = 1;
+      if (currency === "NIO") {
+        const rateInput = window.prompt("Ingresa la tasa de conversión C$ por 1 USD:", "36.50");
+        exchangeRate = Number(rateInput);
+
+        if (!exchangeRate || exchangeRate <= 0) {
+          toast("Debes ingresar una tasa válida.");
+          return;
+        }
+      }
+
+      const originalAmount = Number(form.elements["amount"].value);
+      const amountUsd = currency === "NIO" ? originalAmount / exchangeRate : originalAmount;
+
+      const payload = {
+        id: cryptoRandom(),
+        teacher,
+        date: form.elements["date"].value,
+        createdAt: new Date().toISOString(),
+        subcategory,
+        description: buildTeacherPaymentDescription(teacher, subcategory),
+        currency,
+        exchangeRate,
+        originalAmount,
+        amount: amountUsd,
+        period: form.elements["period"].value.trim(),
+        notes: form.elements["notes"].value.trim()
+      };
+
+      if (!payload.teacher || !payload.date || payload.originalAmount <= 0 || !payload.period) {
+        toast("Completa correctamente todos los campos del pago.");
+        return;
+      }
+
+      data.teacherPayments.unshift(payload);
+      saveData(data);
+      toast("Pago registrado correctamente.");
+      setTimeout(() => window.location.reload(), 300);
+    });
+  }
+
+  renderTeacherSummary(data);
+
+  function updateTeacherDescriptionPreview() {
+    if (!descriptionPreview) return;
+    const teacherName = teacherSelect?.value || "";
+    const subcategory = subcategorySelect?.value || "";
+    descriptionPreview.value = buildTeacherPaymentDescription(teacherName, subcategory);
+  }
+}
+
+function renderTeacherSummary(data) {
+  setText("teacherRegisteredCount", String(data.teachers.filter((item) => item.status === "Activo").length));
+  setText("teacherPaymentsCount", String(data.teacherPayments.length));
+  setText("teacherPaymentsTotal", formatCurrency(sumBy(data.teacherPayments, "amount")));
 
   const table = document.getElementById("teacherTableBody");
   if (table) {
@@ -1084,12 +1223,17 @@ function renderTeachersPage(data) {
         <tr>
           <td>${item.teacher}</td>
           <td>${formatDate(item.date)}</td>
+          <td>${item.subcategory || "-"}</td>
+          <td>${item.description || buildTeacherPaymentDescription(item.teacher, item.subcategory)}</td>
+          <td>${item.currency || "USD"}</td>
+          <td>${formatOriginalCurrency(item.originalAmount ?? item.amount, item.currency || "USD")}</td>
+          <td>${item.currency === "NIO" ? Number(item.exchangeRate || 1).toFixed(2) : "1.00"}</td>
           <td class="amount-negative">${formatCurrency(item.amount)}</td>
           <td>${item.period}</td>
           <td>${item.notes || "-"}</td>
         </tr>
       `).join("")
-      : `<tr><td colspan="5">No hay pagos a maestros registrados.</td></tr>`;
+      : `<tr><td colspan="10">No hay pagos a maestros registrados.</td></tr>`;
   }
 
   const summary = summarizeBy(data.teacherPayments, "teacher");
@@ -1106,6 +1250,73 @@ function renderTeachersPage(data) {
       `).join("")
       : emptyMessage("Aún no hay pagos registrados.");
   }
+}
+
+function ensureTeacherCatalog(data) {
+  if (!Array.isArray(data.teachers)) {
+    data.teachers = [];
+  }
+
+  const namesFromPayments = Array.from(new Set(
+    data.teacherPayments
+      .map((item) => (item.teacher || "").trim())
+      .filter(Boolean)
+  ));
+
+  let changed = false;
+
+  namesFromPayments.forEach((name) => {
+    const exists = data.teachers.some((teacher) => teacher.name.toLowerCase() === name.toLowerCase());
+    if (!exists) {
+      data.teachers.push({
+        id: cryptoRandom(),
+        name,
+        contact: "",
+        status: "Activo",
+        notes: "Importado desde pagos existentes",
+        createdAt: new Date().toISOString()
+      });
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    saveData(data);
+  }
+}
+
+function fillTeacherSelect(select, teachers) {
+  if (!select) return;
+
+  const activeTeachers = teachers.filter((item) => item.status === "Activo");
+  select.innerHTML = activeTeachers.length
+    ? activeTeachers.map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`).join("")
+    : `<option value="">Primero registra un maestro</option>`;
+}
+
+function openTeacherModal(modal, form) {
+  if (!modal) return;
+  modal.classList.add("is-open");
+  document.body.style.overflow = "hidden";
+  setTimeout(() => {
+    form?.elements["name"]?.focus();
+  }, 30);
+}
+
+function closeTeacherModal(modal, form) {
+  if (!modal) return;
+  modal.classList.remove("is-open");
+  document.body.style.overflow = "";
+  form?.reset();
+  if (form?.elements["status"]) {
+    form.elements["status"].value = "Activo";
+  }
+}
+
+function buildTeacherPaymentDescription(teacher, subcategory) {
+  const cleanTeacher = teacher || "sin nombre";
+  const cleanSubcategory = (subcategory || "pago docente").toLowerCase();
+  return `Pago al profesor ${cleanTeacher} por ${cleanSubcategory}`;
 }
 
 function renderInvestmentsPage(data) {
@@ -1496,7 +1707,7 @@ function buildRecentMovementsWithRunningBalance(data) {
     ...data.teacherPayments.map((item, index) => ({
       type: "teacher",
       title: item.teacher,
-      subtitle: `Pago a maestro · ${item.period}`,
+      subtitle: `${item.subcategory || "Pago a maestro"} · ${item.period}`,
       amount: Number(item.amount || 0),
       date: item.date,
       createdAt: item.createdAt || buildLegacyTimestamp(item.date, "teacher", index),
@@ -1555,16 +1766,32 @@ function buildCategoryReportFromMonth(data) {
     .sort((a, b) => b.amount - a.amount);
 }
 
+function summarizeBy(list, field) {
+  return list.reduce((acc, item) => {
+    acc[item[field]] = (acc[item[field]] || 0) + Number(item.amount || 0);
+    return acc;
+  }, {});
+}
+
+function topCategory(list, field) {
+  if (!list.length) return "Sin datos";
+  const summary = list.reduce((acc, item) => {
+    acc[item[field]] = (acc[item[field]] || 0) + Number(item.amount || 0);
+    return acc;
+  }, {});
+  return Object.entries(summary).sort((a, b) => b[1] - a[1])[0][0];
+}
+
 function fillSelect(id, values) {
   const select = document.getElementById(id);
   if (!select) return;
-  select.innerHTML = values.map((value) => `<option value="${value}">${value}</option>`).join("");
+  select.innerHTML = values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("");
 }
 
 function renderTagList(id, items) {
   const container = document.getElementById(id);
   if (!container) return;
-  container.innerHTML = items.map((item) => `<div class="tag-item">${capitalize(item)}</div>`).join("");
+  container.innerHTML = items.map((item) => `<div class="tag-item">${escapeHtml(capitalize(item))}</div>`).join("");
 }
 
 function ensureStudentDatalist(students) {
@@ -1579,7 +1806,7 @@ function ensureStudentDatalist(students) {
 
   datalist.innerHTML = students
     .filter((student) => student.status === "Activo")
-    .map((student) => `<option value="${student.name}"></option>`)
+    .map((student) => `<option value="${escapeHtml(student.name)}"></option>`)
     .join("");
 
   return id;
@@ -1645,10 +1872,15 @@ function downloadCurrentMonthReport(data, studentStats) {
     ]),
     [],
     ["Pagos a maestros"],
-    ["Fecha", "Maestro", "Monto", "Período", "Notas"],
+    ["Fecha", "Maestro", "Subcategoría", "Descripción", "Moneda", "Monto original", "Tasa", "Monto USD", "Período", "Notas"],
     ...teachers.map((item) => [
       item.date,
       item.teacher,
+      item.subcategory || "",
+      item.description || "",
+      item.currency || "USD",
+      item.originalAmount ?? item.amount,
+      item.exchangeRate || 1,
       item.amount,
       item.period,
       item.notes || ""
@@ -1784,7 +2016,16 @@ function csvEscape(value) {
 }
 
 function emptyMessage(message) {
-  return `<div class="mini-stat-card"><span>${message}</span></div>`;
+  return `<div class="mini-stat-card"><span>${escapeHtml(message)}</span></div>`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function toast(message) {
