@@ -3,8 +3,63 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pago de Maestros | Expressive English Academy Finances</title>
+  <title>Pago de maestros | Expressive English Academy Finances</title>
   <link rel="stylesheet" href="styles.css" />
+  <style>
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 10, 20, 0.72);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 1000;
+    }
+
+    .modal-overlay.is-open {
+      display: flex;
+    }
+
+    .modal-card {
+      width: min(560px, 100%);
+      background: linear-gradient(180deg, rgba(12, 24, 42, 0.98), rgba(16, 32, 56, 0.98));
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.35);
+      padding: 24px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .teacher-inline-row {
+      display: flex;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .teacher-inline-row .field {
+      flex: 1;
+    }
+
+    @media (max-width: 720px) {
+      .teacher-inline-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .modal-card {
+        padding: 18px;
+      }
+    }
+  </style>
 </head>
 <body data-page="maestros">
   <div class="app-shell">
@@ -19,7 +74,9 @@
 
       <nav class="sidebar-nav">
         <a href="index.html" class="nav-link">Inicio / Dashboard</a>
+        <a href="estudiantes.html" class="nav-link">Estudiantes</a>
         <a href="ingresos.html" class="nav-link">Ingresos</a>
+        <a href="historial-pagos.html" class="nav-link">Historial de pagos</a>
         <a href="gastos.html" class="nav-link">Gastos</a>
         <a href="cuentas.html" class="nav-link">Cuentas</a>
         <a href="maestros.html" class="nav-link active">Pago de maestros</a>
@@ -28,23 +85,23 @@
       </nav>
 
       <div class="sidebar-footer glass-card">
-        <span class="eyebrow">Cuenta por defecto</span>
-        <p>Los pagos a maestros se descuentan de la cuenta principal bancaria.</p>
+        <span class="eyebrow">Personal docente</span>
+        <p>Registra maestros y clasifica sus pagos por tipo de trabajo para tener mejor control.</p>
       </div>
     </aside>
 
     <div class="main-layout">
       <header class="topbar">
         <div>
-          <span class="eyebrow">Nómina académica</span>
+          <span class="eyebrow">Control docente</span>
           <h1>Pago de maestros</h1>
         </div>
-       <div class="topbar-actions">
-  <span class="status-pill">Modo oscuro activo</span>
-  <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
-  <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
-</div>
 
+        <div class="topbar-actions">
+          <button class="btn btn-primary" id="openTeacherModalBtn">Registrar maestro</button>
+          <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
+          <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
+        </div>
       </header>
 
       <main class="content-grid">
@@ -59,28 +116,59 @@
 
             <form id="teacherForm" class="form-grid">
               <label class="field">
-                <span>Nombre del maestro</span>
-                <input type="text" name="teacher" placeholder="María Fernanda López" required />
-              </label>
-
-              <label class="field">
                 <span>Fecha</span>
                 <input type="date" name="date" required />
               </label>
 
+              <div class="teacher-inline-row field-full">
+                <label class="field">
+                  <span>Maestro</span>
+                  <select name="teacher" id="teacherSelect" required></select>
+                </label>
+
+                <button type="button" class="btn btn-secondary" id="openTeacherModalInlineBtn">
+                  Registrar maestro
+                </button>
+              </div>
+
               <label class="field">
-                <span>Monto</span>
-                <input type="number" step="0.01" min="0" name="amount" required />
+                <span>Subcategoría</span>
+                <select name="subcategory" id="teacherSubcategorySelect" required>
+                  <option value="Horas laborales regulares">Horas laborales regulares</option>
+                  <option value="Horas extra curriculares">Horas extra curriculares</option>
+                  <option value="Tutorías">Tutorías</option>
+                  <option value="Suplencia">Suplencia</option>
+                  <option value="Bonificación">Bonificación</option>
+                  <option value="Otros">Otros</option>
+                </select>
               </label>
 
               <label class="field">
                 <span>Período</span>
-                <input type="text" name="period" placeholder="Abril 2026" required />
+                <input type="text" name="period" placeholder="Semana 1 abril 2026" required />
+              </label>
+
+              <label class="field">
+                <span>Moneda</span>
+                <select name="currency" required>
+                  <option value="USD">USD</option>
+                  <option value="NIO">Córdobas (C$)</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Monto</span>
+                <input type="number" step="0.01" min="0" name="amount" placeholder="0.00" required />
+              </label>
+
+              <label class="field field-full">
+                <span>Descripción automática</span>
+                <input type="text" name="descriptionPreview" id="teacherDescriptionPreview" readonly />
               </label>
 
               <label class="field field-full">
                 <span>Notas</span>
-                <textarea name="notes" placeholder="Pago por clases del período"></textarea>
+                <textarea name="notes" placeholder="Observaciones del pago"></textarea>
               </label>
 
               <button type="submit" class="btn btn-primary">Guardar pago</button>
@@ -90,12 +178,27 @@
           <article class="glass-card">
             <div class="panel-header">
               <div>
-                <span class="eyebrow">Resumen por maestro</span>
-                <h2>Total pagado</h2>
+                <span class="eyebrow">Resumen</span>
+                <h2>Vista rápida</h2>
               </div>
             </div>
 
-            <div id="teacherSummaryCards" class="stack-cards"></div>
+            <div class="stack-cards">
+              <div class="mini-stat-card">
+                <span>Maestros registrados</span>
+                <strong id="teacherRegisteredCount">0</strong>
+              </div>
+              <div class="mini-stat-card">
+                <span>Pagos registrados</span>
+                <strong id="teacherPaymentsCount">0</strong>
+              </div>
+              <div class="mini-stat-card">
+                <span>Total pagado en USD</span>
+                <strong id="teacherPaymentsTotal">$0</strong>
+              </div>
+            </div>
+
+            <div id="teacherSummaryCards" class="stack-cards" style="margin-top: 18px;"></div>
           </article>
         </section>
 
@@ -103,7 +206,7 @@
           <div class="panel-header">
             <div>
               <span class="eyebrow">Historial</span>
-              <h2>Pagos registrados</h2>
+              <h2>Pagos a maestros registrados</h2>
             </div>
           </div>
 
@@ -113,7 +216,12 @@
                 <tr>
                   <th>Maestro</th>
                   <th>Fecha</th>
-                  <th>Monto</th>
+                  <th>Subcategoría</th>
+                  <th>Descripción</th>
+                  <th>Moneda</th>
+                  <th>Monto original</th>
+                  <th>Tasa</th>
+                  <th>Monto USD</th>
                   <th>Período</th>
                   <th>Notas</th>
                 </tr>
@@ -123,6 +231,47 @@
           </div>
         </section>
       </main>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="teacherModal">
+    <div class="modal-card">
+      <div class="panel-header">
+        <div>
+          <span class="eyebrow">Nuevo maestro</span>
+          <h2>Registrar maestro</h2>
+        </div>
+      </div>
+
+      <form id="teacherProfileForm" class="form-grid">
+        <label class="field">
+          <span>Nombre completo</span>
+          <input type="text" name="name" placeholder="Andres" required />
+        </label>
+
+        <label class="field">
+          <span>Contacto</span>
+          <input type="text" name="contact" placeholder="WhatsApp o teléfono" />
+        </label>
+
+        <label class="field">
+          <span>Estado</span>
+          <select name="status">
+            <option value="Activo">Activo</option>
+            <option value="Inactivo">Inactivo</option>
+          </select>
+        </label>
+
+        <label class="field field-full">
+          <span>Notas</span>
+          <textarea name="notes" placeholder="Detalles adicionales del maestro"></textarea>
+        </label>
+
+        <div class="modal-actions field-full">
+          <button type="button" class="btn btn-secondary" id="closeTeacherModalBtn">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar maestro</button>
+        </div>
+      </form>
     </div>
   </div>
 
