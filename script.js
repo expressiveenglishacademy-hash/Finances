@@ -1,5 +1,6 @@
 const STORAGE_KEY = "eea_finances_app_v4";
 const SESSION_KEY = "eea_finances_session";
+const DELETE_CODE = "8681";
 
 document.addEventListener("DOMContentLoaded", () => {
   seedStorage();
@@ -117,37 +118,78 @@ function seedStorage() {
     investmentCategories: Array.isArray(parsed.investmentCategories) ? parsed.investmentCategories : base.investmentCategories,
     accounts: Array.isArray(parsed.accounts) && parsed.accounts.length ? parsed.accounts : base.accounts,
     students: Array.isArray(parsed.students) ? parsed.students : [],
-    incomes: Array.isArray(parsed.incomes)
-      ? parsed.incomes.map((item) => ({
-          ...item,
-          currency: item.currency || "USD",
-          exchangeRate: item.exchangeRate || 1,
-          originalAmount: item.originalAmount ?? item.amount,
-          receiptLevel: item.receiptLevel || item.level || "",
-          createdAt: item.createdAt || toIsoFromDateOnly(item.date)
-        }))
-      : [],
-    expenses: Array.isArray(parsed.expenses)
-      ? parsed.expenses.map((item) => ({
-          ...item,
-          createdAt: item.createdAt || toIsoFromDateOnly(item.date)
-        }))
-      : [],
-    teacherPayments: Array.isArray(parsed.teacherPayments)
-      ? parsed.teacherPayments.map((item) => ({
-          ...item,
-          createdAt: item.createdAt || toIsoFromDateOnly(item.date)
-        }))
-      : [],
-    investments: Array.isArray(parsed.investments)
-      ? parsed.investments.map((item) => ({
-          ...item,
-          createdAt: item.createdAt || toIsoFromDateOnly(item.date)
-        }))
-      : []
+    incomes: normalizeLegacyTimestamps(
+      Array.isArray(parsed.incomes) ? parsed.incomes : [],
+      "income"
+    ).map((item) => ({
+      ...item,
+      currency: item.currency || "USD",
+      exchangeRate: item.exchangeRate || 1,
+      originalAmount: item.originalAmount ?? item.amount,
+      receiptLevel: item.receiptLevel || item.level || ""
+    })),
+    expenses: normalizeLegacyTimestamps(
+      Array.isArray(parsed.expenses) ? parsed.expenses : [],
+      "expense"
+    ),
+    teacherPayments: normalizeLegacyTimestamps(
+      Array.isArray(parsed.teacherPayments) ? parsed.teacherPayments : [],
+      "teacher"
+    ),
+    investments: normalizeLegacyTimestamps(
+      Array.isArray(parsed.investments) ? parsed.investments : [],
+      "investment"
+    )
   };
 
   saveData(merged);
+}
+
+function normalizeLegacyTimestamps(list, type) {
+  const groupedByDate = {};
+
+  list.forEach((item) => {
+    const dateKey = item.date || todayValue();
+    if (!groupByDateExists(groupedByDate, dateKey)) groupedByDate[dateKey] = [];
+    groupedByDate[dateKey].push(item);
+  });
+
+  Object.keys(groupedByDate).forEach((dateKey) => {
+    groupedByDate[dateKey].forEach((item, index) => {
+      if (!item.createdAt) {
+        item.createdAt = buildLegacyTimestamp(dateKey, type, index);
+      }
+    });
+  });
+
+  return list;
+}
+
+function groupByDateExists(groupedByDate, dateKey) {
+  return Object.prototype.hasOwnProperty.call(groupedByDate, dateKey);
+}
+
+function buildLegacyTimestamp(dateString, type, index) {
+  const baseHours = {
+    income: 9,
+    expense: 11,
+    teacher: 14,
+    investment: 16
+  };
+
+  const baseMinutes = {
+    income: 10,
+    expense: 20,
+    teacher: 30,
+    investment: 40
+  };
+
+  const hour = Math.min((baseHours[type] || 10) + Math.floor(index / 3), 20);
+  const minute = ((baseMinutes[type] || 0) + index * 7) % 60;
+  const hh = String(hour).padStart(2, "0");
+  const mm = String(minute).padStart(2, "0");
+
+  return `${dateString}T${hh}:${mm}:00`;
 }
 
 function getData() {
@@ -204,6 +246,16 @@ function bindResetButtons() {
   });
 }
 
+function confirmDelete() {
+  const entered = window.prompt("Ingresa el código de seguridad para borrar este registro:");
+  if (entered === null) return false;
+  if (entered.trim() !== DELETE_CODE) {
+    toast("Código incorrecto. No se eliminó el registro.");
+    return false;
+  }
+  return true;
+}
+
 function renderDashboard(data) {
   const metrics = computeMetrics(data);
   const studentStats = computeStudentStats(data);
@@ -233,11 +285,10 @@ function renderDashboard(data) {
 
   const recentNet = recentIncome - recentDeductions;
 
- setText("recentIncomeTotal", formatCurrency(recentIncome));
-setText("recentDeductionTotal", formatCurrency(recentDeductions));
-setText("recentNetTotal", formatCurrency(recentNet));
-setText("recentBalanceAfter", formatCurrency(metrics.cajaTotal));
-
+  setText("recentIncomeTotal", formatCurrency(recentIncome));
+  setText("recentDeductionTotal", formatCurrency(recentDeductions));
+  setText("recentNetTotal", formatCurrency(recentNet));
+  setText("recentBalanceAfter", formatCurrency(metrics.cajaTotal));
 
   if (movementContainer) {
     movementContainer.innerHTML = recent.length
@@ -276,42 +327,41 @@ setText("recentBalanceAfter", formatCurrency(metrics.cajaTotal));
 
 function renderStudentsPage(data) {
   const form = document.getElementById("studentForm");
+  if (!form) return;
 
-  if (form) {
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
 
-      const payload = {
-        id: cryptoRandom(),
-        name: form.elements["name"].value.trim(),
-        level: form.elements["level"].value.trim(),
-        monthlyFee: Number(form.elements["monthlyFee"].value),
-        dueDay: Number(form.elements["dueDay"].value),
-        status: form.elements["status"].value,
-        contact: form.elements["contact"].value.trim(),
-        notes: form.elements["notes"].value.trim()
-      };
+    const payload = {
+      id: cryptoRandom(),
+      name: form.elements["name"].value.trim(),
+      level: form.elements["level"].value.trim(),
+      monthlyFee: Number(form.elements["monthlyFee"].value),
+      dueDay: Number(form.elements["dueDay"].value),
+      status: form.elements["status"].value,
+      contact: form.elements["contact"].value.trim(),
+      notes: form.elements["notes"].value.trim()
+    };
 
-      if (!payload.name || !payload.level || payload.monthlyFee <= 0 || payload.dueDay < 1 || payload.dueDay > 31) {
-        toast("Completa correctamente los datos del estudiante.");
-        return;
-      }
+    if (!payload.name || !payload.level || payload.monthlyFee <= 0 || payload.dueDay < 1 || payload.dueDay > 31) {
+      toast("Completa correctamente los datos del estudiante.");
+      return;
+    }
 
-      const exists = data.students.some(
-        (student) => student.name.toLowerCase() === payload.name.toLowerCase()
-      );
+    const exists = data.students.some(
+      (student) => student.name.toLowerCase() === payload.name.toLowerCase()
+    );
 
-      if (exists) {
-        toast("Ya existe un estudiante con ese nombre.");
-        return;
-      }
+    if (exists) {
+      toast("Ya existe un estudiante con ese nombre.");
+      return;
+    }
 
-      data.students.unshift(payload);
-      saveData(data);
-      toast("Estudiante guardado correctamente.");
-      setTimeout(() => window.location.reload(), 300);
-    });
-  }
+    data.students.unshift(payload);
+    saveData(data);
+    toast("Estudiante guardado correctamente.");
+    setTimeout(() => window.location.reload(), 300);
+  });
 
   const stats = computeStudentStats(data);
 
@@ -437,16 +487,36 @@ function renderIncomesPage(data) {
               Recibo PDF
             </button>
           </td>
+          <td>
+            <button class="btn btn-secondary btn-sm" data-delete-income="${item.id}">
+              Borrar
+            </button>
+          </td>
         </tr>
       `).join("")
-      : `<tr><td colspan="12">No hay ingresos registrados.</td></tr>`;
+      : `<tr><td colspan="13">No hay ingresos registrados.</td></tr>`;
   }
 
   bindReceiptButtons(data);
+  bindDeleteIncomeButtons(data);
 
   setText("incomeTotalCount", String(data.incomes.length));
   setText("incomeTotalAmount", formatCurrency(sumBy(data.incomes, "amount")));
   setText("incomeLastStudent", data.incomes[0]?.student || "Sin datos");
+}
+
+function bindDeleteIncomeButtons(data) {
+  document.querySelectorAll("[data-delete-income]").forEach((button) => {
+    button.onclick = () => {
+      const id = button.getAttribute("data-delete-income");
+      if (!confirmDelete()) return;
+
+      data.incomes = data.incomes.filter((item) => item.id !== id);
+      saveData(data);
+      toast("Ingreso eliminado correctamente.");
+      setTimeout(() => window.location.reload(), 300);
+    };
+  });
 }
 
 function renderPaymentHistoryPage(data) {
@@ -475,8 +545,8 @@ function renderPaymentHistoryPage(data) {
     }
 
     items.sort((a, b) => {
-      const aTime = new Date(a.createdAt || toIsoFromDateOnly(a.date));
-      const bTime = new Date(b.createdAt || toIsoFromDateOnly(b.date));
+      const aTime = new Date(a.createdAt || buildLegacyTimestamp(a.date, "income", 0));
+      const bTime = new Date(b.createdAt || buildLegacyTimestamp(b.date, "income", 0));
       return order === "asc" ? aTime - bTime : bTime - aTime;
     });
 
@@ -886,14 +956,35 @@ function renderExpensesPage(data) {
           <td class="amount-negative">${formatCurrency(item.amount)}</td>
           <td>${item.account}</td>
           <td>${item.notes || "-"}</td>
+          <td>
+            <button class="btn btn-secondary btn-sm" data-delete-expense="${item.id}">
+              Borrar
+            </button>
+          </td>
         </tr>
       `).join("")
-      : `<tr><td colspan="6">No hay gastos registrados.</td></tr>`;
+      : `<tr><td colspan="7">No hay gastos registrados.</td></tr>`;
   }
+
+  bindDeleteExpenseButtons(data);
 
   setText("expenseTotalAmount", formatCurrency(sumBy(data.expenses, "amount")));
   setText("expenseTotalCount", String(data.expenses.length));
   setText("expenseTopCategory", topCategory(data.expenses, "category"));
+}
+
+function bindDeleteExpenseButtons(data) {
+  document.querySelectorAll("[data-delete-expense]").forEach((button) => {
+    button.onclick = () => {
+      const id = button.getAttribute("data-delete-expense");
+      if (!confirmDelete()) return;
+
+      data.expenses = data.expenses.filter((item) => item.id !== id);
+      saveData(data);
+      toast("Gasto eliminado correctamente.");
+      setTimeout(() => window.location.reload(), 300);
+    };
+  });
 }
 
 function renderAccountsPage(data) {
@@ -930,60 +1021,60 @@ function renderAccountsPage(data) {
   setText("accountsPrimaryName", balances[0]?.name || "Sin datos");
 
   const form = document.getElementById("accountForm");
-  if (form) {
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
+  if (!form) return;
 
-      const payload = {
-        id: cryptoRandom(),
-        name: form.elements["name"].value.trim(),
-        type: form.elements["type"].value,
-        initialBalance: Number(form.elements["initialBalance"].value),
-        notes: form.elements["notes"].value.trim()
-      };
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
 
-      if (!payload.name || Number.isNaN(payload.initialBalance)) {
-        toast("Completa correctamente la cuenta.");
-        return;
-      }
+    const payload = {
+      id: cryptoRandom(),
+      name: form.elements["name"].value.trim(),
+      type: form.elements["type"].value,
+      initialBalance: Number(form.elements["initialBalance"].value),
+      notes: form.elements["notes"].value.trim()
+    };
 
-      data.accounts.push(payload);
-      saveData(data);
-      toast("Cuenta guardada correctamente.");
-      setTimeout(() => window.location.reload(), 300);
-    });
-  }
+    if (!payload.name || Number.isNaN(payload.initialBalance)) {
+      toast("Completa correctamente la cuenta.");
+      return;
+    }
+
+    data.accounts.push(payload);
+    saveData(data);
+    toast("Cuenta guardada correctamente.");
+    setTimeout(() => window.location.reload(), 300);
+  });
 }
 
 function renderTeachersPage(data) {
   const form = document.getElementById("teacherForm");
-  if (form) {
-    form.date.value = todayValue();
+  if (!form) return;
 
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
+  form.date.value = todayValue();
 
-      const payload = {
-        id: cryptoRandom(),
-        teacher: form.elements["teacher"].value.trim(),
-        date: form.elements["date"].value,
-        createdAt: new Date().toISOString(),
-        amount: Number(form.elements["amount"].value),
-        period: form.elements["period"].value.trim(),
-        notes: form.elements["notes"].value.trim()
-      };
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
 
-      if (!payload.teacher || !payload.date || payload.amount <= 0 || !payload.period) {
-        toast("Completa correctamente todos los campos del pago.");
-        return;
-      }
+    const payload = {
+      id: cryptoRandom(),
+      teacher: form.elements["teacher"].value.trim(),
+      date: form.elements["date"].value,
+      createdAt: new Date().toISOString(),
+      amount: Number(form.elements["amount"].value),
+      period: form.elements["period"].value.trim(),
+      notes: form.elements["notes"].value.trim()
+    };
 
-      data.teacherPayments.unshift(payload);
-      saveData(data);
-      toast("Pago registrado correctamente.");
-      setTimeout(() => window.location.reload(), 300);
-    });
-  }
+    if (!payload.teacher || !payload.date || payload.amount <= 0 || !payload.period) {
+      toast("Completa correctamente todos los campos del pago.");
+      return;
+    }
+
+    data.teacherPayments.unshift(payload);
+    saveData(data);
+    toast("Pago registrado correctamente.");
+    setTimeout(() => window.location.reload(), 300);
+  });
 
   const table = document.getElementById("teacherTableBody");
   if (table) {
@@ -1022,34 +1113,34 @@ function renderInvestmentsPage(data) {
   renderTagList("investmentCategoriesList", data.investmentCategories);
 
   const form = document.getElementById("investmentForm");
-  if (form) {
-    form.date.value = todayValue();
+  if (!form) return;
 
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
+  form.date.value = todayValue();
 
-      const payload = {
-        id: cryptoRandom(),
-        date: form.elements["date"].value,
-        createdAt: new Date().toISOString(),
-        concept: form.elements["concept"].value.trim(),
-        category: form.elements["category"].value,
-        amount: Number(form.elements["amount"].value),
-        account: form.elements["account"].value,
-        notes: form.elements["notes"].value.trim()
-      };
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
 
-      if (!payload.date || !payload.concept || payload.amount <= 0) {
-        toast("Completa correctamente todos los campos de la inversión.");
-        return;
-      }
+    const payload = {
+      id: cryptoRandom(),
+      date: form.elements["date"].value,
+      createdAt: new Date().toISOString(),
+      concept: form.elements["concept"].value.trim(),
+      category: form.elements["category"].value,
+      amount: Number(form.elements["amount"].value),
+      account: form.elements["account"].value,
+      notes: form.elements["notes"].value.trim()
+    };
 
-      data.investments.unshift(payload);
-      saveData(data);
-      toast("Inversión guardada correctamente.");
-      setTimeout(() => window.location.reload(), 300);
-    });
-  }
+    if (!payload.date || !payload.concept || payload.amount <= 0) {
+      toast("Completa correctamente todos los campos de la inversión.");
+      return;
+    }
+
+    data.investments.unshift(payload);
+    saveData(data);
+    toast("Inversión guardada correctamente.");
+    setTimeout(() => window.location.reload(), 300);
+  });
 
   const categoryForm = document.getElementById("investmentCategoryForm");
   if (categoryForm) {
@@ -1093,19 +1184,60 @@ function renderInvestmentsPage(data) {
 
 function renderReportsPage(data) {
   const metrics = computeMetrics(data);
+  const monthly = computeMonthlyBreakdown(data);
   const studentStats = computeStudentStats(data);
 
-  setText("reportIncome", formatCurrency(metrics.totalIncome));
-  setText("reportExpenses", formatCurrency(metrics.totalExpenses));
-  setText("reportBalance", formatCurrency(metrics.totalBalance));
+  setText("reportIncome", formatCurrency(monthly.income));
+  setText("reportExpenses", formatCurrency(monthly.totalExpenses));
+  setText("reportBalance", formatCurrency(monthly.balance));
   setText("reportCaja", formatCurrency(metrics.cajaTotal));
+  setText("reportOperationalExpenses", formatCurrency(monthly.operational));
+  setText("reportTeacherExpenses", formatCurrency(monthly.teachers));
+  setText("reportInvestmentExpenses", formatCurrency(monthly.investments));
+  setText("reportNetFlow", formatCurrency(monthly.balance));
 
-  setText("reportStudentsActive", String(studentStats.active));
-  setText("reportStudentsOnTime", String(studentStats.onTime));
-  setText("reportStudentsPending", String(studentStats.pending));
-  setText("reportStudentsLate", String(studentStats.late));
+  const comparison = document.getElementById("comparisonBars");
+  if (comparison) {
+    const maxValue = Math.max(monthly.income, monthly.operational, monthly.teachers, monthly.investments, monthly.totalExpenses, 1);
 
-  const categories = buildCategoryReport(data);
+    comparison.innerHTML = `
+      <div class="comparison-bar-card">
+        <strong>Ingresos</strong>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${(monthly.income / maxValue) * 100}%"></div>
+        </div>
+        <small class="subtle">${formatCurrency(monthly.income)}</small>
+      </div>
+
+      <div class="comparison-bar-card">
+        <strong>Gastos operativos</strong>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${(monthly.operational / maxValue) * 100}%"></div>
+        </div>
+        <small class="subtle">${formatCurrency(monthly.operational)}</small>
+      </div>
+
+      <div class="comparison-bar-card">
+        <strong>Pagos a maestros</strong>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${(monthly.teachers / maxValue) * 100}%"></div>
+        </div>
+        <small class="subtle">${formatCurrency(monthly.teachers)}</small>
+      </div>
+
+      <div class="comparison-bar-card">
+        <strong>Inversiones</strong>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${(monthly.investments / maxValue) * 100}%"></div>
+        </div>
+        <small class="subtle">${formatCurrency(monthly.investments)}</small>
+      </div>
+    `;
+  }
+
+  renderExpensePieChart(monthly);
+
+  const categories = buildCategoryReportFromMonth(data);
   const categoryBars = document.getElementById("categoryBars");
   const maxCategory = Math.max(...categories.map((item) => item.amount), 1);
 
@@ -1122,45 +1254,18 @@ function renderReportsPage(data) {
           </div>
         </div>
       `).join("")
-      : emptyMessage("No hay datos para generar categorías.");
-  }
-
-  const teacherSummary = summarizeBy(data.teacherPayments, "teacher");
-  const teacherCards = document.getElementById("teacherReportCards");
-  if (teacherCards) {
-    const entries = Object.entries(teacherSummary);
-    teacherCards.innerHTML = entries.length
-      ? entries.map(([teacher, amount]) => `
-        <div class="mini-stat-card">
-          <span>${teacher}</span>
-          <strong>${formatCurrency(amount)}</strong>
-          <small>Pagos acumulados</small>
-        </div>
-      `).join("")
-      : emptyMessage("No hay pagos a maestros registrados.");
-  }
-
-  const studentCards = document.getElementById("studentStatusCards");
-  if (studentCards) {
-    studentCards.innerHTML = studentStats.details.length
-      ? studentStats.details.slice(0, 6).map((student) => `
-        <div class="mini-stat-card">
-          <span>${student.name}</span>
-          <strong>${student.statusPayment}</strong>
-          <small>Saldo pendiente: ${formatCurrency(student.pendingAmount)}</small>
-        </div>
-      `).join("")
-      : emptyMessage("No hay estudiantes registrados.");
+      : emptyMessage("No hay egresos este mes.");
   }
 
   const summaryTable = document.getElementById("reportSummaryTable");
   if (summaryTable) {
     summaryTable.innerHTML = `
-      <tr><td>Ingresos acumulados</td><td>${formatCurrency(metrics.totalIncome)}</td></tr>
-      <tr><td>Gastos operativos</td><td>${formatCurrency(sumBy(data.expenses, "amount"))}</td></tr>
-      <tr><td>Pagos a maestros</td><td>${formatCurrency(sumBy(data.teacherPayments, "amount"))}</td></tr>
-      <tr><td>Inversiones</td><td>${formatCurrency(sumBy(data.investments, "amount"))}</td></tr>
-      <tr><td>Balance general</td><td>${formatCurrency(metrics.totalBalance)}</td></tr>
+      <tr><td>Ingresos del mes</td><td>${formatCurrency(monthly.income)}</td></tr>
+      <tr><td>Gastos operativos del mes</td><td>${formatCurrency(monthly.operational)}</td></tr>
+      <tr><td>Pagos a maestros del mes</td><td>${formatCurrency(monthly.teachers)}</td></tr>
+      <tr><td>Inversiones del mes</td><td>${formatCurrency(monthly.investments)}</td></tr>
+      <tr><td>Total de gastos del mes</td><td>${formatCurrency(monthly.totalExpenses)}</td></tr>
+      <tr><td>Balance del mes</td><td>${formatCurrency(monthly.balance)}</td></tr>
       <tr><td>Total en caja</td><td>${formatCurrency(metrics.cajaTotal)}</td></tr>
       <tr><td>Estudiantes activos</td><td>${studentStats.active}</td></tr>
       <tr><td>Al día</td><td>${studentStats.onTime}</td></tr>
@@ -1173,6 +1278,81 @@ function renderReportsPage(data) {
   if (downloadButton) {
     downloadButton.addEventListener("click", () => downloadCurrentMonthReport(data, studentStats));
   }
+}
+
+function renderExpensePieChart(monthly) {
+  const pie = document.getElementById("expensePieChart");
+  const legend = document.getElementById("expensePieLegend");
+  if (!pie || !legend) return;
+
+  const values = [
+    { label: "Gastos operativos", value: monthly.operational, color: "#ff8a65" },
+    { label: "Pagos a maestros", value: monthly.teachers, color: "#4fc3f7" },
+    { label: "Inversiones", value: monthly.investments, color: "#81c784" }
+  ];
+
+  const total = values.reduce((sum, item) => sum + item.value, 0);
+
+  if (total <= 0) {
+    pie.style.background = "rgba(255,255,255,0.05)";
+    legend.innerHTML = emptyMessage("No hay egresos para mostrar este mes.");
+    return;
+  }
+
+  let currentAngle = 0;
+  const segments = values.map((item) => {
+    const start = currentAngle;
+    const percentage = (item.value / total) * 100;
+    currentAngle += percentage;
+    return `${item.color} ${start}% ${currentAngle}%`;
+  });
+
+  pie.style.background = `conic-gradient(${segments.join(", ")})`;
+  pie.style.boxShadow = "inset 0 0 0 18px rgba(7, 17, 31, 0.88), 0 18px 34px rgba(0,0,0,0.25)";
+
+  legend.innerHTML = values.map((item) => `
+    <div class="mini-stat-card">
+      <span style="display:flex; align-items:center; gap:10px;">
+        <span style="width:12px; height:12px; border-radius:50%; background:${item.color}; display:inline-block;"></span>
+        ${item.label}
+      </span>
+      <strong>${formatCurrency(item.value)}</strong>
+      <small>${total > 0 ? ((item.value / total) * 100).toFixed(1) : 0}% del total de egresos</small>
+    </div>
+  `).join("");
+}
+
+function computeMonthlyBreakdown(data) {
+  const month = currentMonth();
+  const year = currentYear();
+
+  const income = data.incomes
+    .filter((item) => isSameMonth(item.date, month, year))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const operational = data.expenses
+    .filter((item) => isSameMonth(item.date, month, year))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const teachers = data.teacherPayments
+    .filter((item) => isSameMonth(item.date, month, year))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const investments = data.investments
+    .filter((item) => isSameMonth(item.date, month, year))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const totalExpenses = operational + teachers + investments;
+  const balance = income - totalExpenses;
+
+  return {
+    income,
+    operational,
+    teachers,
+    investments,
+    totalExpenses,
+    balance
+  };
 }
 
 function computeMetrics(data) {
@@ -1273,7 +1453,6 @@ function getAccountBalances(data) {
       : 0;
 
     const current = Number(account.initialBalance || 0) + incomeTotal - expenseTotal - investmentTotal - teacherTotal;
-
     return { ...account, current };
   });
 }
@@ -1295,49 +1474,45 @@ function buildRecentMovementsWithRunningBalance(data) {
   );
 
   const entries = [
-    ...data.incomes.map((item) => ({
+    ...data.incomes.map((item, index) => ({
       type: "income",
       title: item.student,
       subtitle: `${item.concept} · ${item.account}`,
       amount: Number(item.amount || 0),
       date: item.date,
-      createdAt: item.createdAt || toIsoFromDateOnly(item.date),
+      createdAt: item.createdAt || buildLegacyTimestamp(item.date, "income", index),
       positive: true
     })),
-    ...data.expenses.map((item) => ({
+    ...data.expenses.map((item, index) => ({
       type: "expense",
       title: item.description,
       subtitle: `Gasto · ${item.category} · ${item.account}`,
       amount: Number(item.amount || 0),
       date: item.date,
-      createdAt: item.createdAt || toIsoFromDateOnly(item.date),
+      createdAt: item.createdAt || buildLegacyTimestamp(item.date, "expense", index),
       positive: false
     })),
-    ...data.teacherPayments.map((item) => ({
+    ...data.teacherPayments.map((item, index) => ({
       type: "teacher",
       title: item.teacher,
       subtitle: `Pago a maestro · ${item.period}`,
       amount: Number(item.amount || 0),
       date: item.date,
-      createdAt: item.createdAt || toIsoFromDateOnly(item.date),
+      createdAt: item.createdAt || buildLegacyTimestamp(item.date, "teacher", index),
       positive: false
     })),
-    ...data.investments.map((item) => ({
+    ...data.investments.map((item, index) => ({
       type: "investment",
       title: item.concept,
       subtitle: `Inversión · ${item.category} · ${item.account}`,
       amount: Number(item.amount || 0),
       date: item.date,
-      createdAt: item.createdAt || toIsoFromDateOnly(item.date),
+      createdAt: item.createdAt || buildLegacyTimestamp(item.date, "investment", index),
       positive: false
     }))
   ];
 
-  const chronological = entries.sort((a, b) => {
-    const aTime = new Date(a.createdAt);
-    const bTime = new Date(b.createdAt);
-    return aTime - bTime;
-  });
+  const chronological = entries.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
   let runningBalance = initialBalance;
 
@@ -1354,31 +1529,29 @@ function buildRecentMovementsWithRunningBalance(data) {
   return withBalance.reverse();
 }
 
-function buildCategoryReport(data) {
+function buildCategoryReportFromMonth(data) {
+  const month = currentMonth();
+  const year = currentYear();
   const map = {};
-  data.expenses.forEach((item) => addToMap(map, `Gasto: ${capitalize(item.category)}`, item.amount));
-  data.investments.forEach((item) => addToMap(map, `Inversión: ${capitalize(item.category)}`, item.amount));
-  addToMap(map, "Pagos a maestros", sumBy(data.teacherPayments, "amount"));
+
+  data.expenses
+    .filter((item) => isSameMonth(item.date, month, year))
+    .forEach((item) => addToMap(map, `Gasto: ${capitalize(item.category)}`, item.amount));
+
+  data.investments
+    .filter((item) => isSameMonth(item.date, month, year))
+    .forEach((item) => addToMap(map, `Inversión: ${capitalize(item.category)}`, item.amount));
+
+  const teacherTotal = data.teacherPayments
+    .filter((item) => isSameMonth(item.date, month, year))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  addToMap(map, "Pagos a maestros", teacherTotal);
 
   return Object.entries(map)
+    .filter(([, amount]) => amount > 0)
     .map(([label, amount]) => ({ label, amount }))
     .sort((a, b) => b.amount - a.amount);
-}
-
-function summarizeBy(list, field) {
-  return list.reduce((acc, item) => {
-    acc[item[field]] = (acc[item[field]] || 0) + Number(item.amount || 0);
-    return acc;
-  }, {});
-}
-
-function topCategory(list, field) {
-  if (!list.length) return "Sin datos";
-  const summary = list.reduce((acc, item) => {
-    acc[item[field]] = (acc[item[field]] || 0) + Number(item.amount || 0);
-    return acc;
-  }, {});
-  return Object.entries(summary).sort((a, b) => b[1] - a[1])[0][0];
 }
 
 function fillSelect(id, values) {
@@ -1428,10 +1601,16 @@ function downloadCurrentMonthReport(data, studentStats) {
   });
 
   const incomes = data.incomes.filter((item) => isSameMonth(item.date, month, year));
+  const expenses = data.expenses.filter((item) => isSameMonth(item.date, month, year));
+  const teachers = data.teacherPayments.filter((item) => isSameMonth(item.date, month, year));
+  const investments = data.investments.filter((item) => isSameMonth(item.date, month, year));
 
   const rows = [
     ["Reporte mensual", monthLabel],
-    ["Ingresos", sumBy(incomes, "amount")],
+    ["Ingresos del mes", sumBy(incomes, "amount")],
+    ["Gastos operativos del mes", sumBy(expenses, "amount")],
+    ["Pagos a maestros del mes", sumBy(teachers, "amount")],
+    ["Inversiones del mes", sumBy(investments, "amount")],
     ["Estudiantes activos", studentStats.active],
     ["Al día", studentStats.onTime],
     ["Pendientes", studentStats.pending],
@@ -1451,6 +1630,38 @@ function downloadCurrentMonthReport(data, studentStats) {
       item.exchangeRate || 1,
       item.amount,
       item.account
+    ]),
+    [],
+    ["Gastos"],
+    ["Fecha", "Descripción", "Categoría", "Monto", "Cuenta", "Notas"],
+    ...expenses.map((item) => [
+      item.date,
+      item.description,
+      item.category,
+      item.amount,
+      item.account,
+      item.notes || ""
+    ]),
+    [],
+    ["Pagos a maestros"],
+    ["Fecha", "Maestro", "Monto", "Período", "Notas"],
+    ...teachers.map((item) => [
+      item.date,
+      item.teacher,
+      item.amount,
+      item.period,
+      item.notes || ""
+    ]),
+    [],
+    ["Inversiones"],
+    ["Fecha", "Concepto", "Categoría", "Monto", "Cuenta", "Notas"],
+    ...investments.map((item) => [
+      item.date,
+      item.concept,
+      item.category,
+      item.amount,
+      item.account,
+      item.notes || ""
     ])
   ];
 
@@ -1542,11 +1753,6 @@ function todayValue() {
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
-}
-
-function toIsoFromDateOnly(dateString) {
-  if (!dateString) return new Date().toISOString();
-  return `${dateString}T12:00:00.000Z`;
 }
 
 function isSameMonth(dateString, month, year) {
