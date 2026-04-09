@@ -150,7 +150,9 @@ function normalizeLegacyTimestamps(list, type) {
 
   list.forEach((item) => {
     const dateKey = item.date || todayValue();
-    if (!groupByDateExists(groupedByDate, dateKey)) groupedByDate[dateKey] = [];
+    if (!Object.prototype.hasOwnProperty.call(groupedByDate, dateKey)) {
+      groupedByDate[dateKey] = [];
+    }
     groupedByDate[dateKey].push(item);
   });
 
@@ -163,10 +165,6 @@ function normalizeLegacyTimestamps(list, type) {
   });
 
   return list;
-}
-
-function groupByDateExists(groupedByDate, dateKey) {
-  return Object.prototype.hasOwnProperty.call(groupedByDate, dateKey);
 }
 
 function buildLegacyTimestamp(dateString, type, index) {
@@ -616,10 +614,13 @@ function generateReceiptPDF(data, incomeId) {
   income.receiptLevel = editedLevel.trim() || income.level || "";
   saveData(data);
 
+  const safeStudentName = sanitizeFileName(income.student || "estudiante");
+  const safeDate = (income.date || todayValue()).replaceAll("-", "_");
   const receiptNumber = `REC-${income.date.replaceAll("-", "")}-${income.id.slice(0, 4).toUpperCase()}`;
   const amountOriginal = formatOriginalCurrency(income.originalAmount ?? income.amount, income.currency || "USD");
   const amountUsd = formatCurrency(income.amount);
   const academyLogo = "foto8.jpg.jpg";
+  const documentTitle = `Recibo_${safeStudentName}_${safeDate}`;
 
   const receiptWindow = window.open("", "_blank", "width=900,height=1100");
 
@@ -633,7 +634,7 @@ function generateReceiptPDF(data, incomeId) {
     <html lang="es">
     <head>
       <meta charset="UTF-8" />
-      <title>Recibo ${receiptNumber}</title>
+      <title>${documentTitle}</title>
       <style>
         * { box-sizing: border-box; }
         body {
@@ -1753,6 +1754,14 @@ function todayValue() {
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+function sanitizeFileName(text) {
+  return String(text || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 function isSameMonth(dateString, month, year) {
