@@ -1240,10 +1240,17 @@ function renderTeacherSummary(data) {
           <td class="amount-negative">${formatCurrency(item.amount)}</td>
           <td>${escapeHtml(item.period)}</td>
           <td>${escapeHtml(item.notes || "-")}</td>
+          <td>
+            <button class="btn btn-secondary btn-sm" data-teacher-receipt-id="${item.id}">
+              Recibo PDF
+            </button>
+          </td>
         </tr>
       `).join("")
-      : `<tr><td colspan="10">No hay pagos a maestros registrados.</td></tr>`;
+      : `<tr><td colspan="11">No hay pagos a maestros registrados.</td></tr>`;
   }
+
+  bindTeacherReceiptButtons(data);
 
   const summary = summarizeBy(data.teacherPayments, "teacher");
   const summaryContainer = document.getElementById("teacherSummaryCards");
@@ -1338,6 +1345,303 @@ function renderTeacherSummary(data) {
       }).join("")
       : emptyMessage("No hay maestros registrados para mostrar el desglose.");
   }
+}
+
+function bindTeacherReceiptButtons(data) {
+  document.querySelectorAll("[data-teacher-receipt-id]").forEach((button) => {
+    button.onclick = () => {
+      const id = button.getAttribute("data-teacher-receipt-id");
+      generateTeacherReceiptPDF(data, id);
+    };
+  });
+}
+
+function generateTeacherReceiptPDF(data, paymentId) {
+  const payment = data.teacherPayments.find((item) => item.id === paymentId);
+  if (!payment) {
+    toast("No se encontró el pago para generar el recibo.");
+    return;
+  }
+
+  const teacherProfile = data.teachers.find(
+    (item) => item.name.toLowerCase() === payment.teacher.toLowerCase()
+  );
+
+  const safeTeacherName = sanitizeFileName(payment.teacher || "maestro");
+  const safeDate = (payment.date || todayValue()).replaceAll("-", "_");
+  const documentTitle = `Colilla_${safeTeacherName}_${safeDate}`;
+  const receiptNumber = `PMA-${payment.date.replaceAll("-", "")}-${payment.id.slice(0, 4).toUpperCase()}`;
+  const amountOriginal = formatOriginalCurrency(payment.originalAmount ?? payment.amount, payment.currency || "USD");
+  const amountUsd = formatCurrency(payment.amount);
+
+  const receiptWindow = window.open("", "_blank", "width=920,height=1100");
+  if (!receiptWindow) {
+    toast("Tu navegador bloqueó la ventana del comprobante.");
+    return;
+  }
+
+  receiptWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8" />
+      <title>${documentTitle}</title>
+      <style>
+        * { box-sizing: border-box; }
+        body {
+          margin: 0;
+          font-family: "Segoe UI", Arial, sans-serif;
+          background: #eef3f8;
+          color: #10233b;
+          padding: 32px;
+        }
+        .receipt-sheet {
+          max-width: 880px;
+          margin: 0 auto;
+          background: #ffffff;
+          border-radius: 24px;
+          overflow: hidden;
+          box-shadow: 0 24px 60px rgba(16, 35, 59, 0.18);
+          border: 1px solid rgba(16, 35, 59, 0.08);
+        }
+        .receipt-top {
+          background: linear-gradient(135deg, #0e2238, #18457c 60%, #2f6fd0);
+          color: white;
+          padding: 36px;
+          display: flex;
+          justify-content: space-between;
+          gap: 24px;
+          align-items: center;
+        }
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 18px;
+        }
+        .brand img {
+          width: 92px;
+          height: 92px;
+          object-fit: cover;
+          background: rgba(255,255,255,0.12);
+          border-radius: 18px;
+          padding: 6px;
+        }
+        .brand h1 {
+          margin: 0 0 6px;
+          font-size: 1.7rem;
+        }
+        .brand p {
+          margin: 0;
+          opacity: 0.9;
+        }
+        .receipt-tag {
+          text-align: right;
+        }
+        .receipt-tag span {
+          display: block;
+          font-size: 0.82rem;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          opacity: 0.85;
+        }
+        .receipt-tag strong {
+          display: block;
+          margin-top: 10px;
+          font-size: 1.2rem;
+        }
+        .receipt-body {
+          padding: 34px;
+        }
+        .intro-box {
+          background: linear-gradient(135deg, #f4f8fc, #ffffff);
+          border: 1px solid rgba(16, 35, 59, 0.08);
+          border-radius: 20px;
+          padding: 22px;
+          margin-bottom: 24px;
+        }
+        .intro-box h2 {
+          margin: 0 0 8px;
+          color: #0f2b4b;
+        }
+        .intro-box p {
+          margin: 0;
+          color: #50657f;
+          line-height: 1.6;
+        }
+        .detail-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 18px;
+          margin-bottom: 24px;
+        }
+        .detail-card {
+          border: 1px solid rgba(16, 35, 59, 0.08);
+          border-radius: 18px;
+          padding: 18px;
+          background: #fbfdff;
+        }
+        .detail-card span {
+          display: block;
+          font-size: 0.8rem;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          color: #6d7f94;
+          margin-bottom: 8px;
+        }
+        .detail-card strong {
+          display: block;
+          font-size: 1.08rem;
+          color: #10233b;
+        }
+        .amount-box {
+          margin-top: 10px;
+          background: linear-gradient(135deg, #0f2742, #173e6c);
+          color: white;
+          border-radius: 22px;
+          padding: 24px;
+        }
+        .amount-box span {
+          display: block;
+          opacity: 0.8;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          font-size: 0.82rem;
+          margin-bottom: 10px;
+        }
+        .amount-box strong {
+          font-size: 2.3rem;
+          display: block;
+          margin-bottom: 8px;
+        }
+        .amount-box small {
+          opacity: 0.86;
+          display: block;
+        }
+        .footer-note {
+          margin-top: 26px;
+          padding-top: 20px;
+          border-top: 1px dashed rgba(16, 35, 59, 0.18);
+          color: #5c6f85;
+          line-height: 1.7;
+        }
+        .print-actions {
+          max-width: 880px;
+          margin: 18px auto 0;
+          display: flex;
+          justify-content: flex-end;
+          gap: 12px;
+        }
+        .print-actions button {
+          border: 0;
+          border-radius: 12px;
+          padding: 12px 16px;
+          cursor: pointer;
+          font-size: 0.95rem;
+        }
+        .btn-print {
+          background: #1e4f92;
+          color: white;
+        }
+        .btn-close {
+          background: #dfe8f2;
+          color: #10233b;
+        }
+        @media print {
+          body {
+            background: white;
+            padding: 0;
+          }
+          .print-actions {
+            display: none;
+          }
+          .receipt-sheet {
+            box-shadow: none;
+            border: none;
+            border-radius: 0;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="receipt-sheet">
+        <div class="receipt-top">
+          <div class="brand">
+            <img src="foto8.jpg.jpg" alt="Logo Academia" />
+            <div>
+              <h1>Expressive English Academy</h1>
+              <p>Comprobante de pago a maestro</p>
+            </div>
+          </div>
+
+          <div class="receipt-tag">
+            <span>Colilla</span>
+            <strong>${receiptNumber}</strong>
+          </div>
+        </div>
+
+        <div class="receipt-body">
+          <div class="intro-box">
+            <h2>Comprobante de pago emitido</h2>
+            <p>
+              Este documento sirve como constancia del pago realizado al personal docente de
+              Expressive English Academy.
+            </p>
+          </div>
+
+          <div class="detail-grid">
+            <div class="detail-card">
+              <span>Fecha de pago</span>
+              <strong>${formatDate(payment.date)}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Profesor</span>
+              <strong>${escapeHtml(payment.teacher)}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Subcategoría</span>
+              <strong>${escapeHtml(payment.subcategory || "-")}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Período</span>
+              <strong>${escapeHtml(payment.period || "-")}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Descripción</span>
+              <strong>${escapeHtml(payment.description || "-")}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Contacto</span>
+              <strong>${escapeHtml(teacherProfile?.contact || "-")}</strong>
+            </div>
+          </div>
+
+          <div class="amount-box">
+            <span>Monto pagado</span>
+            <strong>${amountOriginal}</strong>
+            <small>Equivalente en USD: ${amountUsd}</small>
+          </div>
+
+          <div class="footer-note">
+            Firmado digitalmente como comprobante interno de pago.
+            Este documento puede enviarse al maestro como colilla de pago o constancia.
+          </div>
+        </div>
+      </div>
+
+      <div class="print-actions">
+        <button class="btn-close" onclick="window.close()">Cerrar</button>
+        <button class="btn-print" onclick="window.print()">Descargar / Guardar PDF</button>
+      </div>
+    </body>
+    </html>
+  `);
+
+  receiptWindow.document.close();
 }
 
 function bindDeleteTeacherButtons(data) {
