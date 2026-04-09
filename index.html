@@ -128,7 +128,23 @@
               <a href="reportes.html" class="text-link">Ver reportes</a>
             </div>
 
-            <div class="stack-cards" id="recentSummaryCards"></div>
+            <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 18px;">
+              <article class="mini-stat-card">
+                <span>Ingresos recientes</span>
+                <strong id="recentIncomeTotal">$0</strong>
+              </article>
+
+              <article class="mini-stat-card">
+                <span>Deducciones recientes</span>
+                <strong id="recentDeductionTotal">$0</strong>
+              </article>
+
+              <article class="mini-stat-card">
+                <span>Neto reciente</span>
+                <strong id="recentNetTotal">$0</strong>
+              </article>
+            </div>
+
             <div id="recentMovements" class="movement-list"></div>
           </article>
 
