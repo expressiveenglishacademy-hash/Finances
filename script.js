@@ -316,8 +316,8 @@ function renderDashboard(data) {
       ? recent.map((item) => `
         <div class="movement-item">
           <div class="movement-meta">
-            <strong>${item.title}</strong>
-            <small>${item.dateLabel} · ${item.timeLabel} · ${item.subtitle}</small>
+            <strong>${escapeHtml(item.title)}</strong>
+            <small>${item.dateLabel} · ${item.timeLabel} · ${escapeHtml(item.subtitle)}</small>
             <small>Nuevo balance: ${formatCurrency(item.balanceAfter)}</small>
           </div>
           <div class="${item.positive ? "amount-positive" : "amount-negative"}">
@@ -337,7 +337,7 @@ function renderDashboard(data) {
     alertsContainer.innerHTML = alerts.length
       ? alerts.map((student) => `
         <div class="mini-stat-card">
-          <span>${student.name}</span>
+          <span>${escapeHtml(student.name)}</span>
           <strong>${student.statusPayment}</strong>
           <small>Saldo pendiente: ${formatCurrency(student.pendingAmount)}</small>
         </div>
@@ -396,7 +396,7 @@ function renderStudentsPage(data) {
     summaryCards.innerHTML = stats.details.length
       ? stats.details.slice(0, 5).map((student) => `
         <div class="mini-stat-card">
-          <span>${student.name}</span>
+          <span>${escapeHtml(student.name)}</span>
           <strong>${student.statusPayment}</strong>
           <small>Último pago: ${student.lastPayment ? formatDate(student.lastPayment) : "Sin pago"}</small>
         </div>
@@ -409,15 +409,15 @@ function renderStudentsPage(data) {
     tableBody.innerHTML = stats.details.length
       ? stats.details.map((student) => `
         <tr>
-          <td>${student.name}</td>
-          <td>${student.level}</td>
+          <td>${escapeHtml(student.name)}</td>
+          <td>${escapeHtml(student.level)}</td>
           <td>${formatCurrency(student.monthlyFee)}</td>
           <td>${student.lastPayment ? formatDate(student.lastPayment) : "Sin pago"}</td>
           <td>${formatDueDate(student.nextDueDate)}</td>
           <td>${formatCurrency(student.paidThisMonth)}</td>
           <td class="${student.pendingAmount > 0 ? "amount-negative" : "amount-positive"}">${formatCurrency(student.pendingAmount)}</td>
           <td>${student.statusPayment}</td>
-          <td>${student.status}</td>
+          <td>${escapeHtml(student.status)}</td>
         </tr>
       `).join("")
       : `<tr><td colspan="9">No hay estudiantes registrados.</td></tr>`;
@@ -493,16 +493,16 @@ function renderIncomesPage(data) {
       ? data.incomes.map((item) => `
         <tr>
           <td>${formatDate(item.date)}</td>
-          <td>${item.student}</td>
-          <td>${item.level}</td>
-          <td>${item.category}</td>
-          <td>${item.concept}</td>
-          <td>${item.method}</td>
-          <td>${item.currency || "USD"}</td>
+          <td>${escapeHtml(item.student)}</td>
+          <td>${escapeHtml(item.level)}</td>
+          <td>${escapeHtml(item.category)}</td>
+          <td>${escapeHtml(item.concept)}</td>
+          <td>${escapeHtml(item.method)}</td>
+          <td>${escapeHtml(item.currency || "USD")}</td>
           <td>${formatOriginalCurrency(item.originalAmount ?? item.amount, item.currency || "USD")}</td>
           <td>${item.currency === "NIO" ? item.exchangeRate : "1.00"}</td>
           <td class="amount-positive">${formatCurrency(item.amount)}</td>
-          <td>${item.account}</td>
+          <td>${escapeHtml(item.account)}</td>
           <td>
             <button class="btn btn-secondary btn-sm" data-receipt-id="${item.id}">
               Recibo PDF
@@ -576,14 +576,14 @@ function renderPaymentHistoryPage(data) {
         ? items.map((item) => `
           <tr>
             <td>${formatDate(item.date)}</td>
-            <td>${item.student}</td>
-            <td>${item.receiptLevel || item.level || "-"}</td>
-            <td>${item.concept}</td>
-            <td>${item.method}</td>
-            <td>${item.currency || "USD"}</td>
+            <td>${escapeHtml(item.student)}</td>
+            <td>${escapeHtml(item.receiptLevel || item.level || "-")}</td>
+            <td>${escapeHtml(item.concept)}</td>
+            <td>${escapeHtml(item.method)}</td>
+            <td>${escapeHtml(item.currency || "USD")}</td>
             <td>${formatOriginalCurrency(item.originalAmount ?? item.amount, item.currency || "USD")}</td>
             <td class="amount-positive">${formatCurrency(item.amount)}</td>
-            <td>${item.account}</td>
+            <td>${escapeHtml(item.account)}</td>
             <td>
               <button class="btn btn-secondary btn-sm" data-receipt-id="${item.id}">
                 Generar recibo
@@ -642,7 +642,6 @@ function generateReceiptPDF(data, incomeId) {
   const receiptNumber = `REC-${income.date.replaceAll("-", "")}-${income.id.slice(0, 4).toUpperCase()}`;
   const amountOriginal = formatOriginalCurrency(income.originalAmount ?? income.amount, income.currency || "USD");
   const amountUsd = formatCurrency(income.amount);
-  const academyLogo = "foto8.jpg.jpg";
   const documentTitle = `Recibo_${safeStudentName}_${safeDate}`;
 
   const receiptWindow = window.open("", "_blank", "width=900,height=1100");
@@ -868,27 +867,27 @@ function generateReceiptPDF(data, incomeId) {
 
             <div class="detail-card">
               <span>Estudiante</span>
-              <strong>${income.student}</strong>
+              <strong>${escapeHtml(income.student)}</strong>
             </div>
 
             <div class="detail-card">
               <span>Nivel</span>
-              <strong>${income.receiptLevel || income.level || "-"}</strong>
+              <strong>${escapeHtml(income.receiptLevel || income.level || "-")}</strong>
             </div>
 
             <div class="detail-card">
               <span>Concepto</span>
-              <strong>${income.concept}</strong>
+              <strong>${escapeHtml(income.concept)}</strong>
             </div>
 
             <div class="detail-card">
               <span>Método de pago</span>
-              <strong>${income.method}</strong>
+              <strong>${escapeHtml(income.method)}</strong>
             </div>
 
             <div class="detail-card">
               <span>Cuenta destino</span>
-              <strong>${income.account}</strong>
+              <strong>${escapeHtml(income.account)}</strong>
             </div>
           </div>
 
@@ -975,11 +974,11 @@ function renderExpensesPage(data) {
       ? data.expenses.map((item) => `
         <tr>
           <td>${formatDate(item.date)}</td>
-          <td>${item.description}</td>
-          <td>${item.category}</td>
+          <td>${escapeHtml(item.description)}</td>
+          <td>${escapeHtml(item.category)}</td>
           <td class="amount-negative">${formatCurrency(item.amount)}</td>
-          <td>${item.account}</td>
-          <td>${item.notes || "-"}</td>
+          <td>${escapeHtml(item.account)}</td>
+          <td>${escapeHtml(item.notes || "-")}</td>
           <td>
             <button class="btn btn-secondary btn-sm" data-delete-expense="${item.id}">
               Borrar
@@ -1018,9 +1017,9 @@ function renderAccountsPage(data) {
   if (cards) {
     cards.innerHTML = balances.map((account) => `
       <article class="metric-card glass-card">
-        <span class="eyebrow">${account.type}</span>
+        <span class="eyebrow">${escapeHtml(account.type)}</span>
         <h3>${formatCurrency(account.current)}</h3>
-        <p>${account.name}</p>
+        <p>${escapeHtml(account.name)}</p>
       </article>
     `).join("");
   }
@@ -1029,11 +1028,11 @@ function renderAccountsPage(data) {
   if (table) {
     table.innerHTML = balances.map((account) => `
       <tr>
-        <td>${account.name}</td>
-        <td>${account.type}</td>
+        <td>${escapeHtml(account.name)}</td>
+        <td>${escapeHtml(account.type)}</td>
         <td>${formatCurrency(account.initialBalance)}</td>
         <td class="${account.current >= 0 ? "amount-positive" : "amount-negative"}">${formatCurrency(account.current)}</td>
-        <td>${account.notes || "-"}</td>
+        <td>${escapeHtml(account.notes || "-")}</td>
       </tr>
     `).join("");
   }
@@ -1077,20 +1076,22 @@ function renderTeachersPage(data) {
   const teacherSelect = document.getElementById("teacherSelect");
   const subcategorySelect = document.getElementById("teacherSubcategorySelect");
   const descriptionPreview = document.getElementById("teacherDescriptionPreview");
-  const openModalButtons = [
-    document.getElementById("openTeacherModalBtn"),
-    document.getElementById("openTeacherModalInlineBtn")
-  ].filter(Boolean);
   const teacherModal = document.getElementById("teacherModal");
-  const closeTeacherModalBtn = document.getElementById("closeTeacherModalBtn");
   const teacherProfileForm = document.getElementById("teacherProfileForm");
+  const openTeacherModalBtn = document.getElementById("openTeacherModalBtn");
+  const openTeacherModalInlineBtn = document.getElementById("openTeacherModalInlineBtn");
+  const closeTeacherModalBtn = document.getElementById("closeTeacherModalBtn");
 
   fillTeacherSelect(teacherSelect, data.teachers);
   updateTeacherDescriptionPreview();
 
-  openModalButtons.forEach((button) => {
-    button.addEventListener("click", () => openTeacherModal(teacherModal, teacherProfileForm));
-  });
+  if (openTeacherModalBtn) {
+    openTeacherModalBtn.addEventListener("click", () => openTeacherModal(teacherModal, teacherProfileForm));
+  }
+
+  if (openTeacherModalInlineBtn) {
+    openTeacherModalInlineBtn.addEventListener("click", () => openTeacherModal(teacherModal, teacherProfileForm));
+  }
 
   if (closeTeacherModalBtn) {
     closeTeacherModalBtn.addEventListener("click", () => closeTeacherModal(teacherModal, teacherProfileForm));
@@ -1103,6 +1104,12 @@ function renderTeachersPage(data) {
       }
     });
   }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && teacherModal?.classList.contains("is-open")) {
+      closeTeacherModal(teacherModal, teacherProfileForm);
+    }
+  });
 
   if (teacherSelect) {
     teacherSelect.addEventListener("change", updateTeacherDescriptionPreview);
@@ -1212,7 +1219,9 @@ function renderTeachersPage(data) {
 }
 
 function renderTeacherSummary(data) {
-  setText("teacherRegisteredCount", String(data.teachers.filter((item) => item.status === "Activo").length));
+  const activeTeachers = data.teachers.filter((item) => item.status === "Activo");
+
+  setText("teacherRegisteredCount", String(activeTeachers.length));
   setText("teacherPaymentsCount", String(data.teacherPayments.length));
   setText("teacherPaymentsTotal", formatCurrency(sumBy(data.teacherPayments, "amount")));
 
@@ -1221,35 +1230,139 @@ function renderTeacherSummary(data) {
     table.innerHTML = data.teacherPayments.length
       ? data.teacherPayments.map((item) => `
         <tr>
-          <td>${item.teacher}</td>
+          <td>${escapeHtml(item.teacher)}</td>
           <td>${formatDate(item.date)}</td>
-          <td>${item.subcategory || "-"}</td>
-          <td>${item.description || buildTeacherPaymentDescription(item.teacher, item.subcategory)}</td>
-          <td>${item.currency || "USD"}</td>
+          <td>${escapeHtml(item.subcategory || "-")}</td>
+          <td>${escapeHtml(item.description || buildTeacherPaymentDescription(item.teacher, item.subcategory))}</td>
+          <td>${escapeHtml(item.currency || "USD")}</td>
           <td>${formatOriginalCurrency(item.originalAmount ?? item.amount, item.currency || "USD")}</td>
           <td>${item.currency === "NIO" ? Number(item.exchangeRate || 1).toFixed(2) : "1.00"}</td>
           <td class="amount-negative">${formatCurrency(item.amount)}</td>
-          <td>${item.period}</td>
-          <td>${item.notes || "-"}</td>
+          <td>${escapeHtml(item.period)}</td>
+          <td>${escapeHtml(item.notes || "-")}</td>
         </tr>
       `).join("")
       : `<tr><td colspan="10">No hay pagos a maestros registrados.</td></tr>`;
   }
 
   const summary = summarizeBy(data.teacherPayments, "teacher");
-  const container = document.getElementById("teacherSummaryCards");
-  if (container) {
+  const summaryContainer = document.getElementById("teacherSummaryCards");
+  if (summaryContainer) {
     const entries = Object.entries(summary);
-    container.innerHTML = entries.length
+    summaryContainer.innerHTML = entries.length
       ? entries.map(([teacher, amount]) => `
         <div class="mini-stat-card">
-          <span>${teacher}</span>
+          <span>${escapeHtml(teacher)}</span>
           <strong>${formatCurrency(amount)}</strong>
           <small>Total acumulado pagado</small>
         </div>
       `).join("")
       : emptyMessage("Aún no hay pagos registrados.");
   }
+
+  const profilesTable = document.getElementById("teacherProfilesTableBody");
+  if (profilesTable) {
+    profilesTable.innerHTML = data.teachers.length
+      ? data.teachers.map((teacher) => {
+        const payments = data.teacherPayments.filter(
+          (item) => item.teacher.toLowerCase() === teacher.name.toLowerCase()
+        );
+        const totalPaid = payments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+        const lastPayment = payments.sort((a, b) => new Date(b.date) - new Date(a.date))[0]?.date || null;
+
+        return `
+          <tr>
+            <td>${escapeHtml(teacher.name)}</td>
+            <td>${escapeHtml(teacher.contact || "-")}</td>
+            <td>${escapeHtml(teacher.status)}</td>
+            <td>${formatCurrency(totalPaid)}</td>
+            <td>${payments.length}</td>
+            <td>${lastPayment ? formatDate(lastPayment) : "-"}</td>
+            <td>
+              <button class="btn btn-secondary btn-sm" data-delete-teacher="${teacher.id}">
+                Borrar
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join("")
+      : `<tr><td colspan="7">No hay maestros registrados.</td></tr>`;
+  }
+
+  bindDeleteTeacherButtons(data);
+
+  const breakdownContainer = document.getElementById("teacherBreakdownCards");
+  if (breakdownContainer) {
+    const teachersWithTotals = data.teachers.map((teacher) => {
+      const payments = data.teacherPayments.filter(
+        (item) => item.teacher.toLowerCase() === teacher.name.toLowerCase()
+      );
+
+      const total = payments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      const bySubcategory = payments.reduce((acc, item) => {
+        const key = item.subcategory || "Sin categoría";
+        acc[key] = (acc[key] || 0) + Number(item.amount || 0);
+        return acc;
+      }, {});
+
+      return {
+        teacher,
+        total,
+        paymentCount: payments.length,
+        bySubcategory
+      };
+    });
+
+    breakdownContainer.innerHTML = teachersWithTotals.length
+      ? teachersWithTotals.map(({ teacher, total, paymentCount, bySubcategory }) => {
+        const subRows = Object.entries(bySubcategory)
+          .sort((a, b) => b[1] - a[1])
+          .map(([label, amount]) => `
+            <div class="teacher-breakdown-item">
+              <span>${escapeHtml(label)}</span>
+              <strong>${formatCurrency(amount)}</strong>
+            </div>
+          `)
+          .join("");
+
+        return `
+          <div class="mini-stat-card">
+            <span>${escapeHtml(teacher.name)}</span>
+            <strong>${formatCurrency(total)}</strong>
+            <small>${paymentCount} pago(s) registrados</small>
+            <div class="teacher-breakdown-list">
+              ${subRows || `<span>Sin pagos registrados</span>`}
+            </div>
+          </div>
+        `;
+      }).join("")
+      : emptyMessage("No hay maestros registrados para mostrar el desglose.");
+  }
+}
+
+function bindDeleteTeacherButtons(data) {
+  document.querySelectorAll("[data-delete-teacher]").forEach((button) => {
+    button.onclick = () => {
+      const teacherId = button.getAttribute("data-delete-teacher");
+      const teacher = data.teachers.find((item) => item.id === teacherId);
+      if (!teacher) return;
+
+      const confirmed = window.confirm(
+        `Se eliminará el maestro ${teacher.name} y también todos sus pagos registrados. ¿Deseas continuar?`
+      );
+      if (!confirmed) return;
+      if (!confirmDelete()) return;
+
+      data.teachers = data.teachers.filter((item) => item.id !== teacherId);
+      data.teacherPayments = data.teacherPayments.filter(
+        (item) => item.teacher.toLowerCase() !== teacher.name.toLowerCase()
+      );
+
+      saveData(data);
+      toast("Maestro y pagos asociados eliminados correctamente.");
+      setTimeout(() => window.location.reload(), 300);
+    };
+  });
 }
 
 function ensureTeacherCatalog(data) {
@@ -1379,11 +1492,11 @@ function renderInvestmentsPage(data) {
       ? data.investments.map((item) => `
         <tr>
           <td>${formatDate(item.date)}</td>
-          <td>${item.concept}</td>
-          <td>${item.category}</td>
+          <td>${escapeHtml(item.concept)}</td>
+          <td>${escapeHtml(item.category)}</td>
           <td class="amount-negative">${formatCurrency(item.amount)}</td>
-          <td>${item.account}</td>
-          <td>${item.notes || "-"}</td>
+          <td>${escapeHtml(item.account)}</td>
+          <td>${escapeHtml(item.notes || "-")}</td>
         </tr>
       `).join("")
       : `<tr><td colspan="6">No hay inversiones registradas.</td></tr>`;
@@ -1458,7 +1571,7 @@ function renderReportsPage(data) {
       ? categories.map((item) => `
         <div class="bar-row">
           <div class="bar-row-head">
-            <strong>${item.label}</strong>
+            <strong>${escapeHtml(item.label)}</strong>
             <span>${formatCurrency(item.amount)}</span>
           </div>
           <div class="bar-track">
@@ -1526,7 +1639,7 @@ function renderExpensePieChart(monthly) {
     <div class="mini-stat-card">
       <span style="display:flex; align-items:center; gap:10px;">
         <span style="width:12px; height:12px; border-radius:50%; background:${item.color}; display:inline-block;"></span>
-        ${item.label}
+        ${escapeHtml(item.label)}
       </span>
       <strong>${formatCurrency(item.value)}</strong>
       <small>${total > 0 ? ((item.value / total) * 100).toFixed(1) : 0}% del total de egresos</small>
