@@ -49,6 +49,28 @@
       flex: 1;
     }
 
+    .teacher-breakdown-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .teacher-breakdown-list {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 0.92rem;
+    }
+
+    .teacher-breakdown-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+      padding-bottom: 4px;
+    }
+
     @media (max-width: 720px) {
       .teacher-inline-row {
         flex-direction: column;
@@ -86,7 +108,7 @@
 
       <div class="sidebar-footer glass-card">
         <span class="eyebrow">Personal docente</span>
-        <p>Registra maestros y clasifica sus pagos por tipo de trabajo para tener mejor control.</p>
+        <p>Registra maestros, clasifica sus pagos y revisa cuánto se ha invertido en cada uno.</p>
       </div>
     </aside>
 
@@ -98,7 +120,7 @@
         </div>
 
         <div class="topbar-actions">
-          <button class="btn btn-primary" id="openTeacherModalBtn">Registrar maestro</button>
+          <button class="btn btn-primary" id="openTeacherModalBtn" type="button">Registrar maestro</button>
           <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
           <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
         </div>
@@ -163,7 +185,7 @@
 
               <label class="field field-full">
                 <span>Descripción automática</span>
-                <input type="text" name="descriptionPreview" id="teacherDescriptionPreview" readonly />
+                <input type="text" id="teacherDescriptionPreview" readonly />
               </label>
 
               <label class="field field-full">
@@ -185,7 +207,7 @@
 
             <div class="stack-cards">
               <div class="mini-stat-card">
-                <span>Maestros registrados</span>
+                <span>Maestros activos</span>
                 <strong id="teacherRegisteredCount">0</strong>
               </div>
               <div class="mini-stat-card">
@@ -229,6 +251,43 @@
               <tbody id="teacherTableBody"></tbody>
             </table>
           </div>
+        </section>
+
+        <section class="glass-card">
+          <div class="panel-header">
+            <div>
+              <span class="eyebrow">Maestros</span>
+              <h2>Gestionar profesores registrados</h2>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Maestro</th>
+                  <th>Contacto</th>
+                  <th>Estado</th>
+                  <th>Total pagado USD</th>
+                  <th>Pagos</th>
+                  <th>Último pago</th>
+                  <th>Eliminar</th>
+                </tr>
+              </thead>
+              <tbody id="teacherProfilesTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="glass-card">
+          <div class="panel-header">
+            <div>
+              <span class="eyebrow">Desglose</span>
+              <h2>Total pagado a cada profesor</h2>
+            </div>
+          </div>
+
+          <div id="teacherBreakdownCards" class="teacher-breakdown-grid"></div>
         </section>
       </main>
     </div>
