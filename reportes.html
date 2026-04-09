@@ -21,6 +21,7 @@
         <a href="index.html" class="nav-link">Inicio / Dashboard</a>
         <a href="estudiantes.html" class="nav-link">Estudiantes</a>
         <a href="ingresos.html" class="nav-link">Ingresos</a>
+        <a href="historial-pagos.html" class="nav-link">Historial de pagos</a>
         <a href="gastos.html" class="nav-link">Gastos</a>
         <a href="cuentas.html" class="nav-link">Cuentas</a>
         <a href="maestros.html" class="nav-link">Pago de maestros</a>
@@ -29,8 +30,8 @@
       </nav>
 
       <div class="sidebar-footer glass-card">
-        <span class="eyebrow">Reporte visual</span>
-        <p>Indicadores consolidados con diseño ejecutivo y lectura rápida.</p>
+        <span class="eyebrow">Vista ejecutiva</span>
+        <p>Resumen mensual con métricas, barras comparativas y distribución visual de egresos.</p>
       </div>
     </aside>
 
@@ -38,8 +39,9 @@
       <header class="topbar">
         <div>
           <span class="eyebrow">Análisis financiero</span>
-          <h1>Reportes</h1>
+          <h1>Reportes mensuales</h1>
         </div>
+
         <div class="topbar-actions">
           <button class="btn btn-primary" id="downloadMonthlyReportBtn">Descargar reporte mensual</button>
           <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
@@ -50,61 +52,79 @@
       <main class="content-grid">
         <section class="metrics-grid">
           <article class="metric-card glass-card">
-            <span class="eyebrow">Ingresos por período</span>
+            <span class="eyebrow">Ingresos del mes</span>
             <h3 id="reportIncome">$0</h3>
+            <p>Total recibido en el período actual.</p>
           </article>
+
           <article class="metric-card glass-card">
-            <span class="eyebrow">Gastos por período</span>
+            <span class="eyebrow">Gastos del mes</span>
             <h3 id="reportExpenses">$0</h3>
+            <p>Suma de gastos, pagos a maestros e inversiones.</p>
           </article>
+
           <article class="metric-card glass-card">
-            <span class="eyebrow">Balance general</span>
+            <span class="eyebrow">Balance del mes</span>
             <h3 id="reportBalance">$0</h3>
+            <p>Ingresos menos egresos del período.</p>
           </article>
+
           <article class="metric-card glass-card highlight-card">
             <span class="eyebrow">Total en caja</span>
             <h3 id="reportCaja">$0</h3>
+            <p>Saldo disponible actual.</p>
           </article>
         </section>
 
         <section class="metrics-grid">
           <article class="metric-card glass-card">
-            <span class="eyebrow">Estudiantes activos</span>
-            <h3 id="reportStudentsActive">0</h3>
+            <span class="eyebrow">Gastos operativos</span>
+            <h3 id="reportOperationalExpenses">$0</h3>
+            <p>Egresos normales del negocio.</p>
           </article>
+
           <article class="metric-card glass-card">
-            <span class="eyebrow">Al día</span>
-            <h3 id="reportStudentsOnTime">0</h3>
+            <span class="eyebrow">Pagos a maestros</span>
+            <h3 id="reportTeacherExpenses">$0</h3>
+            <p>Total pagado al personal docente.</p>
           </article>
+
           <article class="metric-card glass-card">
-            <span class="eyebrow">Pendientes</span>
-            <h3 id="reportStudentsPending">0</h3>
+            <span class="eyebrow">Inversiones</span>
+            <h3 id="reportInvestmentExpenses">$0</h3>
+            <p>Compras o mejoras de crecimiento.</p>
           </article>
+
           <article class="metric-card glass-card">
-            <span class="eyebrow">Retrasados</span>
-            <h3 id="reportStudentsLate">0</h3>
+            <span class="eyebrow">Flujo neto</span>
+            <h3 id="reportNetFlow">$0</h3>
+            <p>Resultado real del mes en curso.</p>
           </article>
         </section>
 
         <section class="two-column">
+          <article class="glass-card">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Comparativa</span>
+                <h2>Barras ejecutivas</h2>
+              </div>
+            </div>
+            <div id="comparisonBars" class="comparison-bars"></div>
+          </article>
+
           <article class="glass-card">
             <div class="panel-header">
               <div>
                 <span class="eyebrow">Distribución</span>
-                <h2>Resumen por categoría</h2>
+                <h2>Pastel visual de egresos</h2>
               </div>
             </div>
-            <div id="categoryBars" class="bar-chart-list"></div>
-          </article>
 
-          <article class="glass-card">
-            <div class="panel-header">
-              <div>
-                <span class="eyebrow">Pagos</span>
-                <h2>Maestros</h2>
-              </div>
+            <div style="display:grid; gap:18px; align-items:center; justify-items:center;">
+              <div id="expensePieChart" style="width:240px; height:240px; border-radius:50%;"></div>
+              <div id="expensePieLegend" class="stack-cards" style="width:100%;"></div>
             </div>
-            <div id="teacherReportCards" class="stack-cards"></div>
           </article>
         </section>
 
@@ -112,11 +132,11 @@
           <article class="glass-card">
             <div class="panel-header">
               <div>
-                <span class="eyebrow">Seguimiento</span>
-                <h2>Estado de estudiantes</h2>
+                <span class="eyebrow">Resumen por categoría</span>
+                <h2>Barras de egresos</h2>
               </div>
             </div>
-            <div id="studentStatusCards" class="stack-cards"></div>
+            <div id="categoryBars" class="bar-chart-list"></div>
           </article>
 
           <article class="glass-card">
