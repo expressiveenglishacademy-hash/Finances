@@ -19,7 +19,9 @@
 
       <nav class="sidebar-nav">
         <a href="index.html" class="nav-link">Inicio / Dashboard</a>
+        <a href="estudiantes.html" class="nav-link">Estudiantes</a>
         <a href="ingresos.html" class="nav-link">Ingresos</a>
+        <a href="historial-pagos.html" class="nav-link">Historial de pagos</a>
         <a href="gastos.html" class="nav-link active">Gastos</a>
         <a href="cuentas.html" class="nav-link">Cuentas</a>
         <a href="maestros.html" class="nav-link">Pago de maestros</a>
@@ -40,11 +42,9 @@
           <h1>Gastos</h1>
         </div>
         <div class="topbar-actions">
-  <span class="status-pill">Modo oscuro activo</span>
-  <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
-  <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
-</div>
-
+          <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
+          <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
+        </div>
       </header>
 
       <main class="content-grid">
@@ -151,6 +151,7 @@
                   <th>Monto</th>
                   <th>Cuenta de salida</th>
                   <th>Notas</th>
+                  <th>Eliminar</th>
                 </tr>
               </thead>
               <tbody id="expenseTableBody"></tbody>
