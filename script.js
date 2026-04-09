@@ -233,9 +233,11 @@ function renderDashboard(data) {
 
   const recentNet = recentIncome - recentDeductions;
 
-  setText("recentIncomeTotal", formatCurrency(recentIncome));
-  setText("recentDeductionTotal", formatCurrency(recentDeductions));
-  setText("recentNetTotal", formatCurrency(recentNet));
+ setText("recentIncomeTotal", formatCurrency(recentIncome));
+setText("recentDeductionTotal", formatCurrency(recentDeductions));
+setText("recentNetTotal", formatCurrency(recentNet));
+setText("recentBalanceAfter", formatCurrency(metrics.cajaTotal));
+
 
   if (movementContainer) {
     movementContainer.innerHTML = recent.length
