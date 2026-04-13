@@ -348,41 +348,42 @@ function renderDashboard(data) {
 
 function renderStudentsPage(data) {
   const form = document.getElementById("studentForm");
-  if (!form) return;
 
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
+  if (form) {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
 
-    const payload = {
-      id: cryptoRandom(),
-      name: form.elements["name"].value.trim(),
-      level: form.elements["level"].value.trim(),
-      monthlyFee: Number(form.elements["monthlyFee"].value),
-      dueDay: Number(form.elements["dueDay"].value),
-      status: form.elements["status"].value,
-      contact: form.elements["contact"].value.trim(),
-      notes: form.elements["notes"].value.trim()
-    };
+      const payload = {
+        id: cryptoRandom(),
+        name: form.elements["name"].value.trim(),
+        level: form.elements["level"].value.trim(),
+        monthlyFee: Number(form.elements["monthlyFee"].value),
+        dueDay: Number(form.elements["dueDay"].value),
+        status: form.elements["status"].value,
+        contact: form.elements["contact"].value.trim(),
+        notes: form.elements["notes"].value.trim()
+      };
 
-    if (!payload.name || !payload.level || payload.monthlyFee <= 0 || payload.dueDay < 1 || payload.dueDay > 31) {
-      toast("Completa correctamente los datos del estudiante.");
-      return;
-    }
+      if (!payload.name || !payload.level || payload.monthlyFee <= 0 || payload.dueDay < 1 || payload.dueDay > 31) {
+        toast("Completa correctamente los datos del estudiante.");
+        return;
+      }
 
-    const exists = data.students.some(
-      (student) => student.name.toLowerCase() === payload.name.toLowerCase()
-    );
+      const exists = data.students.some(
+        (student) => student.name.toLowerCase() === payload.name.toLowerCase()
+      );
 
-    if (exists) {
-      toast("Ya existe un estudiante con ese nombre.");
-      return;
-    }
+      if (exists) {
+        toast("Ya existe un estudiante con ese nombre.");
+        return;
+      }
 
-    data.students.unshift(payload);
-    saveData(data);
-    toast("Estudiante guardado correctamente.");
-    setTimeout(() => window.location.reload(), 300);
-  });
+      data.students.unshift(payload);
+      saveData(data);
+      toast("Estudiante guardado correctamente.");
+      setTimeout(() => window.location.reload(), 300);
+    });
+  }
 
   const stats = computeStudentStats(data);
 
@@ -399,6 +400,7 @@ function renderStudentsPage(data) {
           <span>${escapeHtml(student.name)}</span>
           <strong>${student.statusPayment}</strong>
           <small>Último pago: ${student.lastPayment ? formatDate(student.lastPayment) : "Sin pago"}</small>
+          <small>Due date actual: día ${student.dueDay}</small>
         </div>
       `).join("")
       : emptyMessage("Aún no hay estudiantes registrados.");
@@ -418,10 +420,47 @@ function renderStudentsPage(data) {
           <td class="${student.pendingAmount > 0 ? "amount-negative" : "amount-positive"}">${formatCurrency(student.pendingAmount)}</td>
           <td>${student.statusPayment}</td>
           <td>${escapeHtml(student.status)}</td>
+          <td>
+            <button class="btn btn-secondary btn-sm" data-edit-due-date="${student.id}">
+              Cambiar fecha
+            </button>
+          </td>
         </tr>
       `).join("")
-      : `<tr><td colspan="9">No hay estudiantes registrados.</td></tr>`;
+      : `<tr><td colspan="10">No hay estudiantes registrados.</td></tr>`;
   }
+
+  bindStudentDueDateButtons(data);
+}
+
+function bindStudentDueDateButtons(data) {
+  document.querySelectorAll("[data-edit-due-date]").forEach((button) => {
+    button.onclick = () => {
+      const studentId = button.getAttribute("data-edit-due-date");
+      const student = data.students.find((item) => item.id === studentId);
+
+      if (!student) return;
+
+      const newDueDay = window.prompt(
+        `Ingresa el nuevo due date para ${student.name} (día del 1 al 31):`,
+        String(student.dueDay || "")
+      );
+
+      if (newDueDay === null) return;
+
+      const parsedDay = Number(newDueDay);
+
+      if (!Number.isInteger(parsedDay) || parsedDay < 1 || parsedDay > 31) {
+        toast("Debes ingresar un día válido entre 1 y 31.");
+        return;
+      }
+
+      student.dueDay = parsedDay;
+      saveData(data);
+      toast(`Due date actualizado para ${student.name}.`);
+      setTimeout(() => window.location.reload(), 300);
+    };
+  });
 }
 
 function renderIncomesPage(data) {
