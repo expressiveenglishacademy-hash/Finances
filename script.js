@@ -173,7 +173,8 @@ function normalizeStudents(list) {
     guardianPhone: item.guardianPhone || "",
     assignedTeacher: item.assignedTeacher || "",
     paymentDate: item.paymentDate || "",
-    materialFee: Number(item.materialFee || 0),
+    materialFee: Number(item.materialFee || item.materialFeeUsd || 0),
+    materialCurrency: item.materialCurrency || "NIO",
     enrollmentDate: item.enrollmentDate || ""
   }));
 }
@@ -389,6 +390,7 @@ function renderStudentsPage(data) {
         assignedTeacher: "",
         paymentDate: "",
         materialFee: 0,
+        materialCurrency: "NIO",
         enrollmentDate: todayValue()
       };
 
@@ -504,7 +506,7 @@ function renderEnrollmentPage(data) {
 
   let latestEnrollmentReceipt = null;
 
-  fillTeacherSelect(teacherSelect, data.teachers);
+  fillEnrollmentTeacherSelect(teacherSelect, data);
 
   if (form?.elements["paymentDate"]) {
     form.elements["paymentDate"].value = todayValue();
@@ -539,14 +541,14 @@ function renderEnrollmentPage(data) {
       const nivel = form.elements["nivel"].value.trim();
       const docente = form.elements["docente"].value.trim();
       const mensualidad = Number(form.elements["mensualidad"].value);
-      const material = Number(form.elements["material"].value);
+      const materialNio = Number(form.elements["materialNio"].value);
       const paymentDate = form.elements["paymentDate"].value;
       const dueDay = Number(form.elements["dueDay"].value);
       const motherName = form.elements["motherName"]?.value.trim() || "";
       const guardianPhone = form.elements["guardianPhone"]?.value.trim() || "";
       const notes = form.elements["notes"].value.trim();
 
-      if (!nombre || !nivel || !docente || mensualidad <= 0 || material < 0 || !paymentDate || dueDay < 1 || dueDay > 31) {
+      if (!nombre || !nivel || !docente || mensualidad <= 0 || materialNio < 0 || !paymentDate || dueDay < 1 || dueDay > 31) {
         toast("Completa correctamente todos los campos obligatorios.");
         return;
       }
@@ -579,7 +581,8 @@ function renderEnrollmentPage(data) {
         guardianPhone,
         assignedTeacher: docente,
         paymentDate,
-        materialFee: material,
+        materialFee: materialNio,
+        materialCurrency: "NIO",
         enrollmentDate: todayValue()
       };
 
@@ -590,8 +593,8 @@ function renderEnrollmentPage(data) {
         studentName: nombre,
         level: nivel,
         assignedTeacher: docente,
-        monthlyFee: mensualidad,
-        materialFee: material,
+        monthlyFeeUsd: mensualidad,
+        materialFeeNio: materialNio,
         paymentDate,
         dueDay,
         studentType,
@@ -611,7 +614,7 @@ function renderEnrollmentPage(data) {
         form.elements["paymentDate"].value = todayValue();
       }
       toggleDependentFields();
-      fillTeacherSelect(teacherSelect, data.teachers);
+      fillEnrollmentTeacherSelect(teacherSelect, data);
     });
   }
 
@@ -627,6 +630,33 @@ function renderEnrollmentPage(data) {
   }
 }
 
+function fillEnrollmentTeacherSelect(select, data) {
+  if (!select) return;
+
+  const names = new Map();
+
+  (data.teachers || []).forEach((teacher) => {
+    if ((teacher.status || "Activo") === "Activo" && teacher.name) {
+      names.set(teacher.name.toLowerCase(), teacher.name);
+    }
+  });
+
+  (data.teacherPayments || []).forEach((payment) => {
+    if (payment.teacher) {
+      const key = payment.teacher.toLowerCase();
+      if (!names.has(key)) {
+        names.set(key, payment.teacher);
+      }
+    }
+  });
+
+  const sortedNames = Array.from(names.values()).sort((a, b) => a.localeCompare(b, "es"));
+
+  select.innerHTML = sortedNames.length
+    ? `<option value="">Selecciona un docente</option>${sortedNames.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}`
+    : `<option value="">Primero registra un docente en maestros</option>`;
+}
+
 function buildEnrollmentReceiptPreview(receipt) {
   return `
     <div class="mini-stat-card">
@@ -636,12 +666,11 @@ function buildEnrollmentReceiptPreview(receipt) {
       <small>Docente asignado: ${escapeHtml(receipt.assignedTeacher)}</small>
       <small>Fecha de pago: ${formatDate(receipt.paymentDate)}</small>
       <small>Due date: día ${receipt.dueDay}</small>
-      <small>Mensualidad: ${formatCurrency(receipt.monthlyFee)}</small>
-      <small>Material: ${formatCurrency(receipt.materialFee)}</small>
+      <small>Mensualidad: ${formatCurrency(receipt.monthlyFeeUsd)}</small>
+      <small>Material: ${formatOriginalCurrency(receipt.materialFeeNio, "NIO")}</small>
       <small>Tipo: ${receipt.studentType === "nino" ? "Niño" : "Adulto"}</small>
       ${receipt.studentType === "nino" ? `<small>Mamá: ${escapeHtml(receipt.motherName)}</small>` : ""}
       ${receipt.studentType === "nino" ? `<small>Teléfono: ${escapeHtml(receipt.guardianPhone)}</small>` : ""}
-      <small>Total inicial: ${formatCurrency(receipt.monthlyFee + receipt.materialFee)}</small>
     </div>
   `;
 }
@@ -650,7 +679,6 @@ function generateEnrollmentReceiptPDF(receipt) {
   const safeStudentName = sanitizeFileName(receipt.studentName || "estudiante");
   const safeDate = (receipt.paymentDate || todayValue()).replaceAll("-", "_");
   const documentTitle = `Matricula_${safeStudentName}_${safeDate}`;
-  const total = Number(receipt.monthlyFee || 0) + Number(receipt.materialFee || 0);
 
   const receiptWindow = window.open("", "_blank", "width=920,height=1100");
   if (!receiptWindow) {
@@ -860,19 +888,20 @@ function generateEnrollmentReceiptPDF(receipt) {
 
             <div class="detail-card">
               <span>Mensualidad</span>
-              <strong>${formatCurrency(receipt.monthlyFee)}</strong>
+              <strong>${formatCurrency(receipt.monthlyFeeUsd)}</strong>
             </div>
 
             <div class="detail-card">
               <span>Material</span>
-              <strong>${formatCurrency(receipt.materialFee)}</strong>
+              <strong>${formatOriginalCurrency(receipt.materialFeeNio, "NIO")}</strong>
             </div>
           </div>
 
           <div class="amount-box">
-            <span>Total inicial</span>
-            <strong>${formatCurrency(total)}</strong>
-            <small>Incluye mensualidad y material.</small>
+            <span>Montos iniciales</span>
+            <strong>${formatCurrency(receipt.monthlyFeeUsd)}</strong>
+            <small>Mensualidad en USD</small>
+            <small>${formatOriginalCurrency(receipt.materialFeeNio, "NIO")} de material en córdobas</small>
           </div>
         </div>
       </div>
@@ -988,6 +1017,530 @@ function renderIncomesPage(data) {
   setText("incomeTotalCount", String(data.incomes.length));
   setText("incomeTotalAmount", formatCurrency(sumBy(data.incomes, "amount")));
   setText("incomeLastStudent", data.incomes[0]?.student || "Sin datos");
+}
+
+function renderPaymentHistoryPage(data) {
+  const searchInput = document.getElementById("paymentHistorySearch");
+  const currencySelect = document.getElementById("paymentHistoryCurrency");
+  const orderSelect = document.getElementById("paymentHistoryOrder");
+  const tableBody = document.getElementById("paymentHistoryTableBody");
+
+  const renderRows = () => {
+    let items = [...data.incomes];
+
+    const search = (searchInput?.value || "").trim().toLowerCase();
+    const currency = currencySelect?.value || "all";
+    const order = orderSelect?.value || "desc";
+
+    if (search) {
+      items = items.filter((item) =>
+        item.student.toLowerCase().includes(search) ||
+        item.level.toLowerCase().includes(search) ||
+        item.concept.toLowerCase().includes(search)
+      );
+    }
+
+    if (currency !== "all") {
+      items = items.filter((item) => (item.currency || "USD") === currency);
+    }
+
+    items.sort((a, b) => {
+      const aTime = new Date(a.createdAt || buildLegacyTimestamp(a.date, "income", 0));
+      const bTime = new Date(b.createdAt || buildLegacyTimestamp(b.date, "income", 0));
+      return order === "asc" ? aTime - bTime : bTime - aTime;
+    });
+
+    if (tableBody) {
+      tableBody.innerHTML = items.length
+        ? items.map((item) => `
+          <tr>
+            <td>${formatDate(item.date)}</td>
+            <td>${escapeHtml(item.student)}</td>
+            <td>${escapeHtml(item.receiptLevel || item.level || "-")}</td>
+            <td>${escapeHtml(item.concept)}</td>
+            <td>${escapeHtml(item.method)}</td>
+            <td>${escapeHtml(item.currency || "USD")}</td>
+            <td>${formatOriginalCurrency(item.originalAmount ?? item.amount, item.currency || "USD")}</td>
+            <td class="amount-positive">${formatCurrency(item.amount)}</td>
+            <td>${escapeHtml(item.account)}</td>
+            <td>
+              <button class="btn btn-secondary btn-sm" data-receipt-id="${item.id}">
+                Generar recibo
+              </button>
+            </td>
+          </tr>
+        `).join("")
+        : `<tr><td colspan="10">No se encontraron pagos.</td></tr>`;
+    }
+
+    bindReceiptButtons(data);
+  };
+
+  setText("historyTotalCount", String(data.incomes.length));
+  setText("historyTotalAmount", formatCurrency(sumBy(data.incomes, "amount")));
+  setText("historyLastDate", data.incomes[0]?.date ? formatDate(data.incomes[0].date) : "-");
+  setText("historyReceiptCount", String(data.incomes.length));
+
+  [searchInput, currencySelect, orderSelect].forEach((element) => {
+    if (!element) return;
+    element.addEventListener("input", renderRows);
+    element.addEventListener("change", renderRows);
+  });
+
+  renderRows();
+}
+
+function bindReceiptButtons(data) {
+  document.querySelectorAll("[data-receipt-id]").forEach((button) => {
+    button.onclick = () => {
+      const id = button.getAttribute("data-receipt-id");
+      generateReceiptPDF(data, id);
+    };
+  });
+}
+
+function generateReceiptPDF(data, incomeId) {
+  const income = data.incomes.find((item) => item.id === incomeId);
+  if (!income) {
+    toast("No se encontró el ingreso para generar el recibo.");
+    return;
+  }
+
+  const editedLevel = window.prompt(
+    "Puedes editar el nivel para este recibo:",
+    income.receiptLevel || income.level || ""
+  );
+
+  if (editedLevel === null) return;
+
+  income.receiptLevel = editedLevel.trim() || income.level || "";
+  saveData(data);
+
+  const safeStudentName = sanitizeFileName(income.student || "estudiante");
+  const safeDate = (income.date || todayValue()).replaceAll("-", "_");
+  const receiptNumber = `REC-${income.date.replaceAll("-", "")}-${income.id.slice(0, 4).toUpperCase()}`;
+  const amountOriginal = formatOriginalCurrency(income.originalAmount ?? income.amount, income.currency || "USD");
+  const amountUsd = formatCurrency(income.amount);
+  const documentTitle = `Recibo_${safeStudentName}_${safeDate}`;
+
+  const receiptWindow = window.open("", "_blank", "width=900,height=1100");
+
+  if (!receiptWindow) {
+    toast("Tu navegador bloqueó la ventana del recibo.");
+    return;
+  }
+
+  receiptWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8" />
+      <title>${documentTitle}</title>
+      <style>
+        * { box-sizing: border-box; }
+        body {
+          margin: 0;
+          font-family: "Segoe UI", Arial, sans-serif;
+          background: #eef3f8;
+          color: #10233b;
+          padding: 32px;
+        }
+        .receipt-sheet {
+          max-width: 850px;
+          margin: 0 auto;
+          background: #ffffff;
+          border-radius: 24px;
+          overflow: hidden;
+          box-shadow: 0 24px 60px rgba(16, 35, 59, 0.18);
+          border: 1px solid rgba(16, 35, 59, 0.08);
+        }
+        .receipt-top {
+          background: linear-gradient(135deg, #0e2238, #1e4f92 60%, #2f6fd0);
+          color: white;
+          padding: 36px;
+          display: flex;
+          justify-content: space-between;
+          gap: 24px;
+          align-items: center;
+        }
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 18px;
+        }
+        .brand img {
+          width: 92px;
+          height: 92px;
+          object-fit: cover;
+          background: rgba(255,255,255,0.12);
+          border-radius: 18px;
+          padding: 6px;
+        }
+        .brand h1 {
+          margin: 0 0 6px;
+          font-size: 1.7rem;
+        }
+        .brand p {
+          margin: 0;
+          opacity: 0.9;
+        }
+        .receipt-tag {
+          text-align: right;
+        }
+        .receipt-tag span {
+          display: block;
+          font-size: 0.82rem;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          opacity: 0.85;
+        }
+        .receipt-tag strong {
+          display: block;
+          margin-top: 10px;
+          font-size: 1.2rem;
+        }
+        .receipt-body {
+          padding: 34px;
+        }
+        .intro-box {
+          background: linear-gradient(135deg, #f4f8fc, #ffffff);
+          border: 1px solid rgba(16, 35, 59, 0.08);
+          border-radius: 20px;
+          padding: 22px;
+          margin-bottom: 24px;
+        }
+        .intro-box h2 {
+          margin: 0 0 8px;
+          color: #0f2b4b;
+        }
+        .intro-box p {
+          margin: 0;
+          color: #50657f;
+          line-height: 1.6;
+        }
+        .detail-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 18px;
+          margin-bottom: 24px;
+        }
+        .detail-card {
+          border: 1px solid rgba(16, 35, 59, 0.08);
+          border-radius: 18px;
+          padding: 18px;
+          background: #fbfdff;
+        }
+        .detail-card span {
+          display: block;
+          font-size: 0.8rem;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          color: #6d7f94;
+          margin-bottom: 8px;
+        }
+        .detail-card strong {
+          display: block;
+          font-size: 1.08rem;
+          color: #10233b;
+        }
+        .amount-box {
+          margin-top: 10px;
+          background: linear-gradient(135deg, #0f2742, #173e6c);
+          color: white;
+          border-radius: 22px;
+          padding: 24px;
+        }
+        .amount-box span {
+          display: block;
+          opacity: 0.8;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          font-size: 0.82rem;
+          margin-bottom: 10px;
+        }
+        .amount-box strong {
+          font-size: 2.3rem;
+          display: block;
+          margin-bottom: 8px;
+        }
+        .amount-box small {
+          opacity: 0.86;
+          display: block;
+        }
+        .footer-note {
+          margin-top: 26px;
+          padding-top: 20px;
+          border-top: 1px dashed rgba(16, 35, 59, 0.18);
+          color: #5c6f85;
+          line-height: 1.7;
+        }
+        .print-actions {
+          max-width: 850px;
+          margin: 18px auto 0;
+          display: flex;
+          justify-content: flex-end;
+          gap: 12px;
+        }
+        .print-actions button {
+          border: 0;
+          border-radius: 12px;
+          padding: 12px 16px;
+          cursor: pointer;
+          font-size: 0.95rem;
+        }
+        .btn-print {
+          background: #1e4f92;
+          color: white;
+        }
+        .btn-close {
+          background: #dfe8f2;
+          color: #10233b;
+        }
+        @media print {
+          body {
+            background: white;
+            padding: 0;
+          }
+          .print-actions {
+            display: none;
+          }
+          .receipt-sheet {
+            box-shadow: none;
+            border: none;
+            border-radius: 0;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="receipt-sheet">
+        <div class="receipt-top">
+          <div class="brand">
+            <img src="foto8.jpg.jpg" alt="Logo Academia" />
+            <div>
+              <h1>Expressive English Academy</h1>
+              <p>Recibo de pago</p>
+            </div>
+          </div>
+
+          <div class="receipt-tag">
+            <span>Recibo</span>
+            <strong>${receiptNumber}</strong>
+          </div>
+        </div>
+
+        <div class="receipt-body">
+          <div class="intro-box">
+            <h2>Pago recibido correctamente</h2>
+            <p>
+              Este documento confirma la recepción del pago realizado a
+              Expressive English Academy.
+            </p>
+          </div>
+
+          <div class="detail-grid">
+            <div class="detail-card">
+              <span>Fecha de pago</span>
+              <strong>${formatDate(income.date)}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Estudiante</span>
+              <strong>${escapeHtml(income.student)}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Nivel</span>
+              <strong>${escapeHtml(income.receiptLevel || income.level || "-")}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Concepto</span>
+              <strong>${escapeHtml(income.concept)}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Método de pago</span>
+              <strong>${escapeHtml(income.method)}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Cuenta destino</span>
+              <strong>${escapeHtml(income.account)}</strong>
+            </div>
+          </div>
+
+          <div class="amount-box">
+            <span>Monto recibido</span>
+            <strong>${amountOriginal}</strong>
+            <small>Equivalente en USD: ${amountUsd}</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="print-actions">
+        <button class="btn-close" onclick="window.close()">Cerrar</button>
+        <button class="btn-print" onclick="window.print()">Descargar / Guardar PDF</button>
+      </div>
+    </body>
+    </html>
+  `);
+
+  receiptWindow.document.close();
+}
+
+function renderExpensesPage(data) {
+  fillSelect("expenseCategorySelect", data.expenseCategories);
+  fillSelect("expenseAccountSelect", data.accounts.map((a) => a.name));
+  renderTagList("expenseCategoriesList", data.expenseCategories);
+
+  const form = document.getElementById("expenseForm");
+  if (form) {
+    form.date.value = todayValue();
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const payload = {
+        id: cryptoRandom(),
+        date: form.elements["date"].value,
+        createdAt: new Date().toISOString(),
+        description: form.elements["description"].value.trim(),
+        category: form.elements["category"].value,
+        amount: Number(form.elements["amount"].value),
+        account: form.elements["account"].value,
+        notes: form.elements["notes"].value.trim()
+      };
+
+      if (!payload.date || !payload.description || payload.amount <= 0) {
+        toast("Completa correctamente todos los campos del gasto.");
+        return;
+      }
+
+      data.expenses.unshift(payload);
+      saveData(data);
+      toast("Gasto guardado correctamente.");
+      setTimeout(() => window.location.reload(), 300);
+    });
+  }
+
+  const categoryForm = document.getElementById("expenseCategoryForm");
+  if (categoryForm) {
+    categoryForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const name = categoryForm.elements["categoryName"].value.trim().toLowerCase();
+      if (!name) return;
+
+      if (!data.expenseCategories.includes(name)) {
+        data.expenseCategories.push(name);
+        saveData(data);
+        toast("Categoría agregada.");
+        setTimeout(() => window.location.reload(), 300);
+      } else {
+        toast("Esa categoría ya existe.");
+      }
+    });
+  }
+
+  const table = document.getElementById("expenseTableBody");
+  if (table) {
+    table.innerHTML = data.expenses.length
+      ? data.expenses.map((item) => `
+        <tr>
+          <td>${formatDate(item.date)}</td>
+          <td>${escapeHtml(item.description)}</td>
+          <td>${escapeHtml(item.category)}</td>
+          <td class="amount-negative">${formatCurrency(item.amount)}</td>
+          <td>${escapeHtml(item.account)}</td>
+          <td>${escapeHtml(item.notes || "-")}</td>
+          <td>
+            <button class="btn btn-secondary btn-sm" data-delete-expense="${item.id}">
+              Borrar
+            </button>
+          </td>
+        </tr>
+      `).join("")
+      : `<tr><td colspan="7">No hay gastos registrados.</td></tr>`;
+  }
+
+  bindDeleteExpenseButtons(data);
+
+  setText("expenseTotalAmount", formatCurrency(sumBy(data.expenses, "amount")));
+  setText("expenseTotalCount", String(data.expenses.length));
+  setText("expenseTopCategory", topCategory(data.expenses, "category"));
+}
+
+function bindDeleteExpenseButtons(data) {
+  document.querySelectorAll("[data-delete-expense]").forEach((button) => {
+    button.onclick = () => {
+      const id = button.getAttribute("data-delete-expense");
+      if (!confirmDelete()) return;
+
+      data.expenses = data.expenses.filter((item) => item.id !== id);
+      saveData(data);
+      toast("Gasto eliminado correctamente.");
+      setTimeout(() => window.location.reload(), 300);
+    };
+  });
+}
+
+function renderAccountsPage(data) {
+  const balances = getAccountBalances(data);
+
+  const cards = document.getElementById("accountsCards");
+  if (cards) {
+    cards.innerHTML = balances.map((account) => `
+      <article class="metric-card glass-card">
+        <span class="eyebrow">${escapeHtml(account.type)}</span>
+        <h3>${formatCurrency(account.current)}</h3>
+        <p>${escapeHtml(account.name)}</p>
+      </article>
+    `).join("");
+  }
+
+  const table = document.getElementById("accountsTableBody");
+  if (table) {
+    table.innerHTML = balances.map((account) => `
+      <tr>
+        <td>${escapeHtml(account.name)}</td>
+        <td>${escapeHtml(account.type)}</td>
+        <td>${formatCurrency(account.initialBalance)}</td>
+        <td class="${account.current >= 0 ? "amount-positive" : "amount-negative"}">${formatCurrency(account.current)}</td>
+        <td>${escapeHtml(account.notes || "-")}</td>
+      </tr>
+    `).join("");
+  }
+
+  const total = balances.reduce((sum, item) => sum + item.current, 0);
+  setText("accountsTotal", formatCurrency(total));
+  setText("accountsSidebarTotal", formatCurrency(total));
+  setText("accountsCount", String(balances.length));
+  setText("accountsPrimaryName", balances[0]?.name || "Sin datos");
+
+  const form = document.getElementById("accountForm");
+  if (!form) return;
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    const payload = {
+      id: cryptoRandom(),
+      name: form.elements["name"].value.trim(),
+      type: form.elements["type"].value,
+      initialBalance: Number(form.elements["initialBalance"].value),
+      notes: form.elements["notes"].value.trim()
+    };
+
+    if (!payload.name || Number.isNaN(payload.initialBalance)) {
+      toast("Completa correctamente la cuenta.");
+      return;
+    }
+
+    data.accounts.push(payload);
+    saveData(data);
+    toast("Cuenta guardada correctamente.");
+    setTimeout(() => window.location.reload(), 300);
+  });
 }
 
 function renderTeachersPage(data) {
@@ -1601,38 +2154,331 @@ function buildTeacherPaymentDescription(teacher, subcategory) {
   return `Pago al profesor ${cleanTeacher} por ${cleanSubcategory}`;
 }
 
-function computeMetrics(data) {
-  const totalIncome = sumBy(data.incomes, "amount");
-  const totalExpenses =
-    sumBy(data.expenses, "amount") +
-    sumBy(data.teacherPayments, "amount") +
-    sumBy(data.investments, "amount");
+function computeStudentStats(data) {
+  const activeStudents = data.students.filter((student) => student.status === "Activo");
 
-  const totalBalance = totalIncome - totalExpenses;
+  const details = activeStudents.map((student) => {
+    const payments = data.incomes
+      .filter((income) => income.student.toLowerCase() === student.name.toLowerCase())
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const lastPayment = payments[0]?.date || null;
+    const paidThisMonth = payments
+      .filter((payment) => isSameMonth(payment.date, currentMonth(), currentYear()))
+      .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+
+    const pendingAmount = Math.max(Number(student.monthlyFee || 0) - paidThisMonth, 0);
+    const nextDueDate = buildDueDate(student.dueDay);
+
+    let statusPayment = "Pendiente";
+    if (pendingAmount <= 0) {
+      statusPayment = "Al día";
+    } else if (new Date() > nextDueDate) {
+      statusPayment = "Retrasado";
+    }
+
+    return {
+      ...student,
+      lastPayment,
+      paidThisMonth,
+      pendingAmount,
+      nextDueDate,
+      statusPayment
+    };
+  });
+
+  return {
+    active: activeStudents.length,
+    onTime: details.filter((item) => item.statusPayment === "Al día").length,
+    pending: details.filter((item) => item.statusPayment === "Pendiente").length,
+    late: details.filter((item) => item.statusPayment === "Retrasado").length,
+    details: details.sort((a, b) => {
+      const order = { "Retrasado": 0, "Pendiente": 1, "Al día": 2 };
+      return order[a.statusPayment] - order[b.statusPayment];
+    })
+  };
+}
+
+function getAccountBalances(data) {
+  return data.accounts.map((account) => {
+    const incomeTotal = data.incomes
+      .filter((item) => item.account === account.name)
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    const expenseTotal = data.expenses
+      .filter((item) => item.account === account.name)
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    const investmentTotal = data.investments
+      .filter((item) => item.account === account.name)
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    const teacherTotal = account.name === "Banco USD"
+      ? sumBy(data.teacherPayments, "amount")
+      : 0;
+
+    const current = Number(account.initialBalance || 0) + incomeTotal - expenseTotal - investmentTotal - teacherTotal;
+    return { ...account, current };
+  });
+}
+
+function buildRecentMovementsWithRunningBalance(data) {
+  const initialBalance = data.accounts.reduce(
+    (sum, account) => sum + Number(account.initialBalance || 0),
+    0
+  );
+
+  const entries = [
+    ...data.incomes.map((item, index) => ({
+      type: "income",
+      title: item.student,
+      subtitle: `${item.concept} · ${item.account}`,
+      amount: Number(item.amount || 0),
+      date: item.date,
+      createdAt: item.createdAt || buildLegacyTimestamp(item.date, "income", index),
+      positive: true
+    })),
+    ...data.expenses.map((item, index) => ({
+      type: "expense",
+      title: item.description,
+      subtitle: `Gasto · ${item.category} · ${item.account}`,
+      amount: Number(item.amount || 0),
+      date: item.date,
+      createdAt: item.createdAt || buildLegacyTimestamp(item.date, "expense", index),
+      positive: false
+    })),
+    ...data.teacherPayments.map((item, index) => ({
+      type: "teacher",
+      title: item.teacher,
+      subtitle: `${item.subcategory || "Pago a maestro"} · ${item.period}`,
+      amount: Number(item.amount || 0),
+      date: item.date,
+      createdAt: item.createdAt || buildLegacyTimestamp(item.date, "teacher", index),
+      positive: false
+    })),
+    ...data.investments.map((item, index) => ({
+      type: "investment",
+      title: item.concept,
+      subtitle: `Inversión · ${item.category} · ${item.account}`,
+      amount: Number(item.amount || 0),
+      date: item.date,
+      createdAt: item.createdAt || buildLegacyTimestamp(item.date, "investment", index),
+      positive: false
+    }))
+  ];
+
+  const chronological = entries.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+  let runningBalance = initialBalance;
+
+  const withBalance = chronological.map((item) => {
+    runningBalance += item.positive ? item.amount : -item.amount;
+    return {
+      ...item,
+      balanceAfter: runningBalance,
+      dateLabel: formatDate(item.date),
+      timeLabel: formatTime(item.createdAt)
+    };
+  });
+
+  return withBalance.reverse();
+}
+
+function syncIncomeToStudent(data, income) {
+  const foundStudent = data.students.find(
+    (student) => student.name.toLowerCase() === income.student.toLowerCase()
+  );
+  if (!foundStudent) return;
+  if (!foundStudent.level && income.level) {
+    foundStudent.level = income.level;
+  }
+}
+
+function buildCategoryReportFromMonth(data) {
   const month = currentMonth();
   const year = currentYear();
+  const map = {};
 
-  const incomesMonth = data.incomes
+  data.expenses
+    .filter((item) => isSameMonth(item.date, month, year))
+    .forEach((item) => addToMap(map, `Gasto: ${capitalize(item.category)}`, item.amount));
+
+  data.investments
+    .filter((item) => isSameMonth(item.date, month, year))
+    .forEach((item) => addToMap(map, `Inversión: ${capitalize(item.category)}`, item.amount));
+
+  const teacherTotal = data.teacherPayments
     .filter((item) => isSameMonth(item.date, month, year))
     .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-  const expensesMonth =
-    data.expenses.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0) +
-    data.teacherPayments.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0) +
-    data.investments.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  addToMap(map, "Pagos a maestros", teacherTotal);
 
-  const balanceMonth = incomesMonth - expensesMonth;
-  const cajaTotal = getAccountBalances(data).reduce((sum, item) => sum + item.current, 0);
+  return Object.entries(map)
+    .filter(([, amount]) => amount > 0)
+    .map(([label, amount]) => ({ label, amount }))
+    .sort((a, b) => b.amount - a.amount);
+}
 
-  return {
-    totalIncome,
-    totalExpenses,
-    totalBalance,
-    incomesMonth,
-    expensesMonth,
-    balanceMonth,
-    cajaTotal
-  };
+function summarizeBy(list, field) {
+  return list.reduce((acc, item) => {
+    acc[item[field]] = (acc[item[field]] || 0) + Number(item.amount || 0);
+    return acc;
+  }, {});
+}
+
+function topCategory(list, field) {
+  if (!list.length) return "Sin datos";
+  const summary = list.reduce((acc, item) => {
+    acc[item[field]] = (acc[item[field]] || 0) + Number(item.amount || 0);
+    return acc;
+  }, {});
+  return Object.entries(summary).sort((a, b) => b[1] - a[1])[0][0];
+}
+
+function fillSelect(id, values) {
+  const select = document.getElementById(id);
+  if (!select) return;
+  select.innerHTML = values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("");
+}
+
+function renderTagList(id, items) {
+  const container = document.getElementById(id);
+  if (!container) return;
+  container.innerHTML = items.map((item) => `<div class="tag-item">${escapeHtml(capitalize(item))}</div>`).join("");
+}
+
+function ensureStudentDatalist(students) {
+  const id = "studentsDatalist";
+  let datalist = document.getElementById(id);
+
+  if (!datalist) {
+    datalist = document.createElement("datalist");
+    datalist.id = id;
+    document.body.appendChild(datalist);
+  }
+
+  datalist.innerHTML = students
+    .filter((student) => student.status === "Activo")
+    .map((student) => `<option value="${escapeHtml(student.name)}"></option>`)
+    .join("");
+
+  return id;
+}
+
+function buildDueDate(dueDay) {
+  const year = currentYear();
+  const month = currentMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const safeDay = Math.min(Number(dueDay || 1), lastDay);
+  return new Date(year, month, safeDay, 23, 59, 59);
+}
+
+function downloadCurrentMonthReport(data, studentStats) {
+  const month = currentMonth();
+  const year = currentYear();
+  const monthLabel = new Date(year, month, 1).toLocaleDateString("es-MX", {
+    month: "long",
+    year: "numeric"
+  });
+
+  const incomes = data.incomes.filter((item) => isSameMonth(item.date, month, year));
+  const expenses = data.expenses.filter((item) => isSameMonth(item.date, month, year));
+  const teachers = data.teacherPayments.filter((item) => isSameMonth(item.date, month, year));
+  const investments = data.investments.filter((item) => isSameMonth(item.date, month, year));
+  const enrollments = data.students.filter((item) => isSameMonth(item.enrollmentDate || item.paymentDate || "", month, year));
+
+  const rows = [
+    ["Reporte mensual", monthLabel],
+    ["Ingresos del mes", sumBy(incomes, "amount")],
+    ["Gastos operativos del mes", sumBy(expenses, "amount")],
+    ["Pagos a maestros del mes", sumBy(teachers, "amount")],
+    ["Inversiones del mes", sumBy(investments, "amount")],
+    ["Estudiantes activos", studentStats.active],
+    ["Al día", studentStats.onTime],
+    ["Pendientes", studentStats.pending],
+    ["Retrasados", studentStats.late],
+    [],
+    ["Matriculas"],
+    ["Fecha matrícula", "Fecha pago", "Estudiante", "Nivel", "Docente", "Tipo", "Mensualidad USD", "Material C$", "Due date"],
+    ...enrollments.map((item) => [
+      item.enrollmentDate || "",
+      item.paymentDate || "",
+      item.name || "",
+      item.level || "",
+      item.assignedTeacher || "",
+      item.studentType === "nino" ? "Niño" : "Adulto",
+      item.monthlyFee || 0,
+      item.materialFee || 0,
+      item.dueDay || ""
+    ]),
+    [],
+    ["Ingresos"],
+    ["Fecha", "Estudiante", "Nivel", "Concepto", "Categoría", "Método", "Moneda", "Monto original", "Tasa", "Monto USD", "Cuenta"],
+    ...incomes.map((item) => [
+      item.date,
+      item.student,
+      item.level,
+      item.concept,
+      item.category,
+      item.method,
+      item.currency || "USD",
+      item.originalAmount ?? item.amount,
+      item.exchangeRate || 1,
+      item.amount,
+      item.account
+    ]),
+    [],
+    ["Gastos"],
+    ["Fecha", "Descripción", "Categoría", "Monto", "Cuenta", "Notas"],
+    ...expenses.map((item) => [
+      item.date,
+      item.description,
+      item.category,
+      item.amount,
+      item.account,
+      item.notes || ""
+    ]),
+    [],
+    ["Pagos a maestros"],
+    ["Fecha", "Maestro", "Subcategoría", "Descripción", "Moneda", "Monto original", "Tasa", "Monto USD", "Período", "Notas"],
+    ...teachers.map((item) => [
+      item.date,
+      item.teacher,
+      item.subcategory || "",
+      item.description || "",
+      item.currency || "USD",
+      item.originalAmount ?? item.amount,
+      item.exchangeRate || 1,
+      item.amount,
+      item.period,
+      item.notes || ""
+    ]),
+    [],
+    ["Inversiones"],
+    ["Fecha", "Concepto", "Categoría", "Monto", "Cuenta", "Notas"],
+    ...investments.map((item) => [
+      item.date,
+      item.concept,
+      item.category,
+      item.amount,
+      item.account,
+      item.notes || ""
+    ])
+  ];
+
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `reporte_mensual_${year}-${String(month + 1).padStart(2, "0")}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+
+  toast("Reporte mensual descargado.");
 }
 
 function updateSidebarCaja(data) {
@@ -1719,8 +2565,9 @@ function sanitizeFileName(text) {
 }
 
 function isSameMonth(dateString, month, year) {
+  if (!dateString) return false;
   const date = new Date(`${dateString}T00:00:00`);
-  return date.getMonth() === month && date.getFullYear() === year;
+  return !Number.isNaN(date.getTime()) && date.getMonth() === month && date.getFullYear() === year;
 }
 
 function capitalize(text) {
