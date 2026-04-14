@@ -3,128 +3,169 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Matrícula | Expressive English Academy Finances</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>Matrícula | Expressive English Academy</title>
+
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: white;
+      padding: 20px;
+    }
+
+    .form-container {
+      background: rgba(255,255,255,0.05);
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 500px;
+    }
+
+    .field {
+      display: block;
+      margin-bottom: 15px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+    }
+
+    button {
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .btn-primary { background: #22c55e; color: white; }
+    .btn-secondary { background: #3b82f6; color: white; }
+
+    .preview {
+      margin-top: 20px;
+      background: rgba(255,255,255,0.08);
+      padding: 15px;
+      border-radius: 10px;
+    }
+  </style>
 </head>
 
-<body data-page="matricula">
-  <div class="app-shell">
+<body>
 
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-      <a href="index.html" class="brand-block">
-        <div class="brand-mark">EE</div>
-        <div>
-          <strong>Expressive English</strong>
-          <span>Academy Finances</span>
-        </div>
-      </a>
+<h1>📘 Matrícula de Estudiantes</h1>
 
-      <nav class="sidebar-nav">
-        <a href="index.html" class="nav-link">Inicio / Dashboard</a>
-        <a href="estudiantes.html" class="nav-link">Estudiantes</a>
-        <a href="matricula.html" class="nav-link active">Matrícula</a>
-        <a href="ingresos.html" class="nav-link">Ingresos</a>
-        <a href="historial-pagos.html" class="nav-link">Historial de pagos</a>
-        <a href="gastos.html" class="nav-link">Gastos</a>
-        <a href="cuentas.html" class="nav-link">Cuentas</a>
-        <a href="maestros.html" class="nav-link">Pago de maestros</a>
-        <a href="inversiones.html" class="nav-link">Inversiones</a>
-        <a href="reportes.html" class="nav-link">Reportes</a>
-      </nav>
+<div class="form-container">
+  <form id="matriculaForm">
 
-      <div class="sidebar-footer glass-card">
-        <span class="eyebrow">Matrícula</span>
-        <p>Registra nuevos estudiantes y genera su comprobante de inscripción.</p>
-      </div>
-    </aside>
+    <label class="field">
+      <span>Nombre del estudiante</span>
+      <input type="text" id="nombre" required />
+    </label>
 
-    <!-- MAIN -->
-    <div class="main-layout">
+    <label class="field">
+      <span>Nivel</span>
+      <input type="text" id="nivel" required />
+    </label>
 
-      <!-- TOPBAR -->
-      <header class="topbar">
-        <div>
-          <span class="eyebrow">Gestión académica</span>
-          <h1>Matrícula</h1>
-        </div>
+    <label class="field">
+      <span>Docente asignado</span>
+      <input type="text" id="docente" required />
+    </label>
 
-        <div class="topbar-actions">
-          <button class="btn btn-secondary" id="downloadReceipt">
-            Descargar comprobante
-          </button>
-        </div>
-      </header>
+    <label class="field">
+      <span>Costo mensualidad ($)</span>
+      <input type="number" id="mensualidad" required />
+    </label>
 
-      <!-- CONTENT -->
-      <main class="content-grid">
+    <label class="field">
+      <span>Costo de material ($)</span>
+      <input type="number" id="material" required />
+    </label>
 
-        <section class="two-column">
+    <button type="submit" class="btn-primary">Generar comprobante</button>
+  </form>
 
-          <!-- FORMULARIO -->
-          <article class="glass-card">
-            <div class="panel-header">
-              <div>
-                <span class="eyebrow">Nuevo ingreso</span>
-                <h2>Registrar matrícula</h2>
-              </div>
-            </div>
+  <div class="preview" id="preview" style="display:none;"></div>
 
-            <form id="matriculaForm" class="form-grid">
+  <button id="downloadPDF" class="btn-secondary" style="display:none;">
+    Descargar PDF
+  </button>
+</div>
 
-              <label class="field">
-                <span>Nombre del estudiante</span>
-                <input type="text" name="nombre" required />
-              </label>
+<script>
+  const form = document.getElementById("matriculaForm");
+  const preview = document.getElementById("preview");
+  const downloadBtn = document.getElementById("downloadPDF");
 
-              <label class="field">
-                <span>Nivel</span>
-                <input type="text" name="nivel" required />
-              </label>
+  let data = {};
 
-              <label class="field">
-                <span>Docente asignado</span>
-                <input type="text" name="docente" required />
-              </label>
+  // 🔥 Tasa de cambio (puedes ajustarla)
+  const tasa = 36.5;
 
-              <label class="field">
-                <span>Costo mensualidad ($)</span>
-                <input type="number" step="0.01" name="mensualidad" required />
-              </label>
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
 
-              <label class="field">
-                <span>Costo de material ($)</span>
-                <input type="number" step="0.01" name="material" required />
-              </label>
+    const mensualidadUSD = parseFloat(document.getElementById("mensualidad").value);
+    const materialUSD = parseFloat(document.getElementById("material").value);
 
-              <button type="submit" class="btn btn-primary">
-                Generar comprobante
-              </button>
+    data = {
+      nombre: document.getElementById("nombre").value,
+      nivel: document.getElementById("nivel").value,
+      docente: document.getElementById("docente").value,
+      mensualidadUSD,
+      materialUSD,
+      mensualidadNIO: (mensualidadUSD * tasa).toFixed(2),
+      materialNIO: (materialUSD * tasa).toFixed(2),
+      fecha: new Date().toLocaleDateString()
+    };
 
-            </form>
-          </article>
+    preview.style.display = "block";
+    downloadBtn.style.display = "block";
 
-          <!-- PREVIEW -->
-          <article class="glass-card">
-            <div class="panel-header">
-              <div>
-                <span class="eyebrow">Vista previa</span>
-                <h2>Comprobante de matrícula</h2>
-              </div>
-            </div>
+    preview.innerHTML = `
+      <h3>📄 Comprobante de Matrícula</h3>
+      <p><strong>Nombre:</strong> ${data.nombre}</p>
+      <p><strong>Nivel:</strong> ${data.nivel}</p>
+      <p><strong>Docente:</strong> ${data.docente}</p>
 
-            <div id="receiptPreview" class="receipt-preview">
-              <p>Aquí aparecerá el comprobante generado...</p>
-            </div>
-          </article>
+      <p><strong>Mensualidad:</strong> $${data.mensualidadUSD} 
+      (C$ ${data.mensualidadNIO})</p>
 
-        </section>
+      <p><strong>Material:</strong> $${data.materialUSD} 
+      (C$ ${data.materialNIO})</p>
 
-      </main>
+      <p><strong>Fecha:</strong> ${data.fecha}</p>
+    `;
+  });
 
-    </div>
-  </div>
+  downloadBtn.addEventListener("click", function(){
 
-  <script src="script.js"></script>
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.text("Expressive English Academy", 20, 20);
+
+    doc.setFontSize(12);
+    doc.text("Comprobante de Matrícula", 20, 30);
+
+    doc.text(`Nombre: ${data.nombre}`, 20, 50);
+    doc.text(`Nivel: ${data.nivel}`, 20, 60);
+    doc.text(`Docente: ${data.docente}`, 20, 70);
+
+    doc.text(`Mensualidad: $${data.mensualidadUSD} (C$ ${data.mensualidadNIO})`, 20, 80);
+    doc.text(`Material: $${data.materialUSD} (C$ ${data.materialNIO})`, 20, 90);
+
+    doc.text(`Fecha: ${data.fecha}`, 20, 100);
+
+    doc.save(`Matricula_${data.nombre}.pdf`);
+  });
+</script>
+
 </body>
 </html>
