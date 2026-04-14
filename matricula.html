@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Matrícula | Expressive English Academy</title>
 
-  <!-- jsPDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <style>
@@ -37,8 +36,8 @@
 
     button {
       padding: 12px;
-      border: none;
       border-radius: 10px;
+      border: none;
       cursor: pointer;
       margin-top: 10px;
     }
@@ -51,6 +50,10 @@
       background: rgba(255,255,255,0.08);
       padding: 15px;
       border-radius: 10px;
+    }
+
+    .hidden {
+      display: none;
     }
   </style>
 </head>
@@ -83,9 +86,28 @@
     </label>
 
     <label class="field">
-      <span>Costo de material ($)</span>
+      <span>Costo de material (C$)</span>
       <input type="number" id="material" required />
     </label>
+
+    <!-- Checkbox menor -->
+    <label class="field">
+      <input type="checkbox" id="menorCheck" />
+      Es menor de edad
+    </label>
+
+    <!-- Campos adicionales -->
+    <div id="menorFields" class="hidden">
+      <label class="field">
+        <span>Nombre del padre/madre</span>
+        <input type="text" id="responsable" />
+      </label>
+
+      <label class="field">
+        <span>Teléfono</span>
+        <input type="text" id="telefono" />
+      </label>
+    </div>
 
     <button type="submit" class="btn-primary">Generar comprobante</button>
   </form>
@@ -98,29 +120,38 @@
 </div>
 
 <script>
+  const tasa = 36.5;
+
   const form = document.getElementById("matriculaForm");
   const preview = document.getElementById("preview");
   const downloadBtn = document.getElementById("downloadPDF");
 
+  const menorCheck = document.getElementById("menorCheck");
+  const menorFields = document.getElementById("menorFields");
+
   let data = {};
 
-  // 🔥 Tasa de cambio (puedes ajustarla)
-  const tasa = 36.5;
+  // Mostrar/ocultar campos
+  menorCheck.addEventListener("change", () => {
+    menorFields.classList.toggle("hidden", !menorCheck.checked);
+  });
 
   form.addEventListener("submit", function(e){
     e.preventDefault();
 
     const mensualidadUSD = parseFloat(document.getElementById("mensualidad").value);
-    const materialUSD = parseFloat(document.getElementById("material").value);
+    const materialNIO = parseFloat(document.getElementById("material").value);
 
     data = {
       nombre: document.getElementById("nombre").value,
       nivel: document.getElementById("nivel").value,
       docente: document.getElementById("docente").value,
       mensualidadUSD,
-      materialUSD,
       mensualidadNIO: (mensualidadUSD * tasa).toFixed(2),
-      materialNIO: (materialUSD * tasa).toFixed(2),
+      materialNIO,
+      esMenor: menorCheck.checked,
+      responsable: document.getElementById("responsable").value,
+      telefono: document.getElementById("telefono").value,
       fecha: new Date().toLocaleDateString()
     };
 
@@ -133,25 +164,24 @@
       <p><strong>Nivel:</strong> ${data.nivel}</p>
       <p><strong>Docente:</strong> ${data.docente}</p>
 
-      <p><strong>Mensualidad:</strong> $${data.mensualidadUSD} 
-      (C$ ${data.mensualidadNIO})</p>
+      <p><strong>Mensualidad:</strong> $${data.mensualidadUSD} (C$ ${data.mensualidadNIO})</p>
+      <p><strong>Material:</strong> C$ ${data.materialNIO}</p>
 
-      <p><strong>Material:</strong> $${data.materialUSD} 
-      (C$ ${data.materialNIO})</p>
+      ${data.esMenor ? `
+        <hr>
+        <p><strong>Responsable:</strong> ${data.responsable}</p>
+        <p><strong>Teléfono:</strong> ${data.telefono}</p>
+      ` : ""}
 
       <p><strong>Fecha:</strong> ${data.fecha}</p>
     `;
   });
 
   downloadBtn.addEventListener("click", function(){
-
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    doc.setFontSize(16);
     doc.text("Expressive English Academy", 20, 20);
-
-    doc.setFontSize(12);
     doc.text("Comprobante de Matrícula", 20, 30);
 
     doc.text(`Nombre: ${data.nombre}`, 20, 50);
@@ -159,9 +189,14 @@
     doc.text(`Docente: ${data.docente}`, 20, 70);
 
     doc.text(`Mensualidad: $${data.mensualidadUSD} (C$ ${data.mensualidadNIO})`, 20, 80);
-    doc.text(`Material: $${data.materialUSD} (C$ ${data.materialNIO})`, 20, 90);
+    doc.text(`Material: C$ ${data.materialNIO}`, 20, 90);
 
-    doc.text(`Fecha: ${data.fecha}`, 20, 100);
+    if (data.esMenor) {
+      doc.text(`Responsable: ${data.responsable}`, 20, 110);
+      doc.text(`Teléfono: ${data.telefono}`, 20, 120);
+    }
+
+    doc.text(`Fecha: ${data.fecha}`, 20, 140);
 
     doc.save(`Matricula_${data.nombre}.pdf`);
   });
