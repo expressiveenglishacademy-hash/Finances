@@ -1,92 +1,159 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Matrícula</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Matrícula | Expressive English Academy Finances</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .hidden-field {
+      display: none;
+    }
+  </style>
 </head>
 
-<body>
+<body data-page="matricula">
+  <div class="app-shell">
 
-<div class="glass-card" style="max-width:600px;margin:auto;margin-top:40px;">
-  <h2>Matrícula</h2>
+    <aside class="sidebar">
+      <a href="index.html" class="brand-block">
+        <div class="brand-mark">EE</div>
+        <div>
+          <strong>Expressive English</strong>
+          <span>Academy Finances</span>
+        </div>
+      </a>
 
-  <form id="form">
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-link">Inicio / Dashboard</a>
+        <a href="estudiantes.html" class="nav-link">Estudiantes</a>
+        <a href="matricula.html" class="nav-link active">Matrícula</a>
+        <a href="ingresos.html" class="nav-link">Ingresos</a>
+        <a href="historial-pagos.html" class="nav-link">Historial de pagos</a>
+        <a href="gastos.html" class="nav-link">Gastos</a>
+        <a href="cuentas.html" class="nav-link">Cuentas</a>
+        <a href="maestros.html" class="nav-link">Pago de maestros</a>
+        <a href="inversiones.html" class="nav-link">Inversiones</a>
+        <a href="reportes.html" class="nav-link">Reportes</a>
+      </nav>
 
-    <input type="text" id="nombre" placeholder="Nombre del estudiante" required><br><br>
+      <div class="sidebar-footer glass-card">
+        <span class="eyebrow">Matrícula</span>
+        <p>Registra nuevos estudiantes, asigna docente y genera su comprobante de inscripción.</p>
+      </div>
+    </aside>
 
-    <input type="text" id="nivel" placeholder="Nivel" required><br><br>
+    <div class="main-layout">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow">Gestión académica</span>
+          <h1>Matrícula</h1>
+        </div>
 
-    <input type="text" id="docente" placeholder="Docente" required><br><br>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary" id="downloadReceipt" type="button">
+            Descargar comprobante
+          </button>
+          <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
+        </div>
+      </header>
 
-    <input type="number" id="mensualidad" placeholder="Mensualidad $" required><br><br>
+      <main class="content-grid">
+        <section class="two-column">
 
-    <input type="number" id="material" placeholder="Material C$" required><br><br>
+          <article class="glass-card">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Nuevo ingreso</span>
+                <h2>Registrar matrícula</h2>
+              </div>
+            </div>
 
-    <label>
-      <input type="checkbox" id="menor"> Es menor de edad
-    </label><br><br>
+            <form id="matriculaForm" class="form-grid">
+              <label class="field">
+                <span>Nombre del estudiante</span>
+                <input type="text" name="nombre" required />
+              </label>
 
-    <div id="extra" style="display:none;">
-      <input type="text" id="responsable" placeholder="Nombre del padre/madre"><br><br>
-      <input type="text" id="telefono" placeholder="Teléfono"><br><br>
+              <label class="field">
+                <span>Nivel</span>
+                <input type="text" name="nivel" required />
+              </label>
+
+              <label class="field">
+                <span>Tipo de estudiante</span>
+                <select name="studentType" id="studentTypeSelect" required>
+                  <option value="adulto">Adulto</option>
+                  <option value="nino">Niño</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Docente asignado</span>
+                <select name="docente" id="matriculaTeacherSelect" required>
+                  <option value="">Selecciona un docente</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Costo mensualidad ($)</span>
+                <input type="number" step="0.01" min="0" name="mensualidad" required />
+              </label>
+
+              <label class="field">
+                <span>Costo de material ($)</span>
+                <input type="number" step="0.01" min="0" name="material" required />
+              </label>
+
+              <label class="field">
+                <span>Fecha de pago</span>
+                <input type="date" name="paymentDate" required />
+              </label>
+
+              <label class="field">
+                <span>Due date / día de vencimiento</span>
+                <input type="number" min="1" max="31" name="dueDay" required />
+              </label>
+
+              <label class="field hidden-field" id="motherNameField">
+                <span>Nombre de la mamá</span>
+                <input type="text" name="motherName" />
+              </label>
+
+              <label class="field hidden-field" id="guardianPhoneField">
+                <span>Número telefónico</span>
+                <input type="text" name="guardianPhone" />
+              </label>
+
+              <label class="field field-full">
+                <span>Notas</span>
+                <textarea name="notes" placeholder="Observaciones de matrícula"></textarea>
+              </label>
+
+              <button type="submit" class="btn btn-primary">
+                Generar comprobante
+              </button>
+            </form>
+          </article>
+
+          <article class="glass-card">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Vista previa</span>
+                <h2>Comprobante de matrícula</h2>
+              </div>
+            </div>
+
+            <div id="receiptPreview" class="receipt-preview">
+              <p>Aquí aparecerá el comprobante generado...</p>
+            </div>
+          </article>
+
+        </section>
+      </main>
     </div>
+  </div>
 
-    <button type="submit">Generar comprobante</button>
-
-  </form>
-</div>
-
-<!-- COMPROBANTE -->
-<div id="recibo" class="glass-card" style="max-width:600px;margin:auto;margin-top:20px;display:none;"></div>
-
-<script>
-const tasa = 36.5;
-
-const form = document.getElementById("form");
-const recibo = document.getElementById("recibo");
-const menor = document.getElementById("menor");
-const extra = document.getElementById("extra");
-
-menor.addEventListener("change", () => {
-  extra.style.display = menor.checked ? "block" : "none";
-});
-
-form.addEventListener("submit", function(e){
-  e.preventDefault();
-
-  const nombre = document.getElementById("nombre").value;
-  const nivel = document.getElementById("nivel").value;
-  const docente = document.getElementById("docente").value;
-  const mensualidad = parseFloat(document.getElementById("mensualidad").value);
-  const material = parseFloat(document.getElementById("material").value);
-
-  const mensualidadNIO = (mensualidad * tasa).toFixed(2);
-
-  const responsable = document.getElementById("responsable").value;
-  const telefono = document.getElementById("telefono").value;
-
-  recibo.style.display = "block";
-
-  recibo.innerHTML = `
-    <h3>Comprobante de Matrícula</h3>
-    <hr>
-
-    <p><b>Nombre:</b> ${nombre}</p>
-    <p><b>Nivel:</b> ${nivel}</p>
-    <p><b>Docente:</b> ${docente}</p>
-
-    <p><b>Mensualidad:</b> $${mensualidad} / C$ ${mensualidadNIO}</p>
-    <p><b>Material:</b> C$ ${material}</p>
-
-    ${menor.checked ? `
-      <hr>
-      <p><b>Responsable:</b> ${responsable}</p>
-      <p><b>Teléfono:</b> ${telefono}</p>
-    ` : ""}
-  `;
-});
-</script>
-
+  <script src="script.js"></script>
 </body>
 </html>
