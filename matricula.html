@@ -1,158 +1,92 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Matrícula | Expressive English Academy Finances</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta charset="UTF-8">
+  <title>Matrícula</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 
-<body data-page="matricula">
-  <div class="app-shell">
+<body>
 
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-      <a href="index.html" class="brand-block">
-        <div class="brand-mark">EE</div>
-        <div>
-          <strong>Expressive English</strong>
-          <span>Academy Finances</span>
-        </div>
-      </a>
+<div class="glass-card" style="max-width:600px;margin:auto;margin-top:40px;">
+  <h2>Matrícula</h2>
 
-      <nav class="sidebar-nav">
-        <a href="index.html" class="nav-link">Inicio / Dashboard</a>
-        <a href="estudiantes.html" class="nav-link">Estudiantes</a>
-        <a href="matricula.html" class="nav-link active">Matrícula</a>
-        <a href="ingresos.html" class="nav-link">Ingresos</a>
-        <a href="historial-pagos.html" class="nav-link">Historial de pagos</a>
-        <a href="gastos.html" class="nav-link">Gastos</a>
-        <a href="cuentas.html" class="nav-link">Cuentas</a>
-        <a href="maestros.html" class="nav-link">Pago de maestros</a>
-        <a href="inversiones.html" class="nav-link">Inversiones</a>
-        <a href="reportes.html" class="nav-link">Reportes</a>
-      </nav>
+  <form id="form">
 
-      <div class="sidebar-footer glass-card">
-        <span class="eyebrow">Matrícula</span>
-        <p>Registro formal de estudiantes y emisión de comprobante.</p>
-      </div>
-    </aside>
+    <input type="text" id="nombre" placeholder="Nombre del estudiante" required><br><br>
 
-    <!-- MAIN -->
-    <div class="main-layout">
+    <input type="text" id="nivel" placeholder="Nivel" required><br><br>
 
-      <!-- HEADER -->
-      <header class="topbar">
-        <div>
-          <span class="eyebrow">Gestión académica</span>
-          <h1>Matrícula</h1>
-        </div>
+    <input type="text" id="docente" placeholder="Docente" required><br><br>
 
-        <div class="topbar-actions">
-          <button class="btn btn-secondary" id="downloadReceipt">
-            Descargar comprobante
-          </button>
-        </div>
-      </header>
+    <input type="number" id="mensualidad" placeholder="Mensualidad $" required><br><br>
 
-      <!-- CONTENT -->
-      <main class="content-grid">
+    <input type="number" id="material" placeholder="Material C$" required><br><br>
 
-        <section class="two-column">
+    <label>
+      <input type="checkbox" id="menor"> Es menor de edad
+    </label><br><br>
 
-          <!-- FORM -->
-          <article class="glass-card">
-            <div class="panel-header">
-              <div>
-                <span class="eyebrow">Nuevo registro</span>
-                <h2>Datos del estudiante</h2>
-              </div>
-            </div>
-
-            <form id="matriculaForm" class="form-grid">
-
-              <label class="field">
-                <span>Nombre completo</span>
-                <input type="text" name="nombre" required />
-              </label>
-
-              <label class="field">
-                <span>Nivel</span>
-                <input type="text" name="nivel" required />
-              </label>
-
-              <label class="field">
-                <span>Docente</span>
-                <input type="text" name="docente" required />
-              </label>
-
-              <label class="field">
-                <span>Mensualidad (USD)</span>
-                <input type="number" step="0.01" name="mensualidad" required />
-              </label>
-
-              <label class="field">
-                <span>Material (C$)</span>
-                <input type="number" step="0.01" name="material" required />
-              </label>
-
-              <label class="field field-full">
-                <input type="checkbox" id="menorCheck" />
-                <span>Este estudiante es menor de edad</span>
-              </label>
-
-              <div id="menorFields" class="form-grid" style="display:none;">
-                <label class="field">
-                  <span>Responsable</span>
-                  <input type="text" name="responsable" />
-                </label>
-
-                <label class="field">
-                  <span>Teléfono</span>
-                  <input type="text" name="telefono" />
-                </label>
-              </div>
-
-              <button type="submit" class="btn btn-primary">
-                Generar comprobante
-              </button>
-
-            </form>
-          </article>
-
-          <!-- RECEIPT PREVIEW -->
-          <article id="preview" class="glass-card" style="display:none;">
-
-            <div class="panel-header">
-              <div>
-                <span class="eyebrow">Comprobante</span>
-                <h2>Vista previa</h2>
-              </div>
-            </div>
-
-            <div class="receipt-box" id="receiptContent">
-
-              <!-- HEADER -->
-              <div class="receipt-header">
-                <strong>Expressive English Academy</strong>
-                <span>Comprobante de Matrícula</span>
-              </div>
-
-              <!-- BODY -->
-              <div class="receipt-body" id="receiptBody"></div>
-
-            </div>
-
-          </article>
-
-        </section>
-
-      </main>
-
+    <div id="extra" style="display:none;">
+      <input type="text" id="responsable" placeholder="Nombre del padre/madre"><br><br>
+      <input type="text" id="telefono" placeholder="Teléfono"><br><br>
     </div>
-  </div>
 
-  <script src="script.js"></script>
+    <button type="submit">Generar comprobante</button>
+
+  </form>
+</div>
+
+<!-- COMPROBANTE -->
+<div id="recibo" class="glass-card" style="max-width:600px;margin:auto;margin-top:20px;display:none;"></div>
+
+<script>
+const tasa = 36.5;
+
+const form = document.getElementById("form");
+const recibo = document.getElementById("recibo");
+const menor = document.getElementById("menor");
+const extra = document.getElementById("extra");
+
+menor.addEventListener("change", () => {
+  extra.style.display = menor.checked ? "block" : "none";
+});
+
+form.addEventListener("submit", function(e){
+  e.preventDefault();
+
+  const nombre = document.getElementById("nombre").value;
+  const nivel = document.getElementById("nivel").value;
+  const docente = document.getElementById("docente").value;
+  const mensualidad = parseFloat(document.getElementById("mensualidad").value);
+  const material = parseFloat(document.getElementById("material").value);
+
+  const mensualidadNIO = (mensualidad * tasa).toFixed(2);
+
+  const responsable = document.getElementById("responsable").value;
+  const telefono = document.getElementById("telefono").value;
+
+  recibo.style.display = "block";
+
+  recibo.innerHTML = `
+    <h3>Comprobante de Matrícula</h3>
+    <hr>
+
+    <p><b>Nombre:</b> ${nombre}</p>
+    <p><b>Nivel:</b> ${nivel}</p>
+    <p><b>Docente:</b> ${docente}</p>
+
+    <p><b>Mensualidad:</b> $${mensualidad} / C$ ${mensualidadNIO}</p>
+    <p><b>Material:</b> C$ ${material}</p>
+
+    ${menor.checked ? `
+      <hr>
+      <p><b>Responsable:</b> ${responsable}</p>
+      <p><b>Teléfono:</b> ${telefono}</p>
+    ` : ""}
+  `;
+});
+</script>
+
 </body>
 </html>
