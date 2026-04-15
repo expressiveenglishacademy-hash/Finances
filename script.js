@@ -26,6 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const handlers = {
     dashboard: () => renderDashboard(data),
     estudiantes: () => renderStudentsPage(data),
+    matricula: () => renderEnrollmentPage(data),
     ingresos: () => renderIncomesPage(data),
     historial: () => renderPaymentHistoryPage(data),
     gastos: () => renderExpensesPage(data),
@@ -461,6 +462,432 @@ function bindStudentDueDateButtons(data) {
       setTimeout(() => window.location.reload(), 300);
     };
   });
+}
+
+function renderEnrollmentPage(data) {
+  ensureTeacherCatalog(data);
+
+  const form = document.getElementById("matriculaForm");
+  const teacherSelect = document.getElementById("matriculaTeacherSelect");
+  const studentTypeSelect = document.getElementById("studentTypeSelect");
+  const motherNameField = document.getElementById("motherNameField");
+  const guardianPhoneField = document.getElementById("guardianPhoneField");
+  const receiptPreview = document.getElementById("receiptPreview");
+  const downloadButton = document.getElementById("downloadReceipt");
+
+  let latestEnrollmentReceipt = null;
+
+  fillEnrollmentTeacherSelect(teacherSelect, data);
+
+  if (form?.elements["paymentDate"]) {
+    form.elements["paymentDate"].value = todayValue();
+  }
+
+  const toggleDependentFields = () => {
+    const isChild = studentTypeSelect?.value === "nino";
+
+    if (motherNameField?.querySelector("input")) {
+      motherNameField.classList.toggle("hidden-field", !isChild);
+      motherNameField.querySelector("input").required = isChild;
+    }
+
+    if (guardianPhoneField?.querySelector("input")) {
+      guardianPhoneField.classList.toggle("hidden-field", !isChild);
+      guardianPhoneField.querySelector("input").required = isChild;
+    }
+  };
+
+  toggleDependentFields();
+
+  if (studentTypeSelect) {
+    studentTypeSelect.addEventListener("change", toggleDependentFields);
+  }
+
+  if (form) {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const studentType = form.elements["studentType"]?.value || "adulto";
+      const nombre = form.elements["nombre"]?.value.trim() || "";
+      const nivel = form.elements["nivel"]?.value.trim() || "";
+      const docente = form.elements["docente"]?.value.trim() || "";
+      const mensualidad = Number(form.elements["mensualidad"]?.value || 0);
+      const materialNio = Number(form.elements["materialNio"]?.value || form.elements["material"]?.value || 0);
+      const paymentDate = form.elements["paymentDate"]?.value || todayValue();
+      const dueDay = Number(form.elements["dueDay"]?.value || 1);
+      const motherName = form.elements["motherName"]?.value.trim() || "";
+      const guardianPhone = form.elements["guardianPhone"]?.value.trim() || "";
+      const notes = form.elements["notes"]?.value.trim() || "";
+
+      if (!nombre || !nivel || !docente || mensualidad <= 0 || materialNio < 0 || !paymentDate || dueDay < 1 || dueDay > 31) {
+        toast("Completa correctamente todos los campos obligatorios.");
+        return;
+      }
+
+      if (studentType === "nino" && (!motherName || !guardianPhone)) {
+        toast("Para estudiantes niños debes agregar nombre de la mamá y teléfono.");
+        return;
+      }
+
+      const exists = data.students.some(
+        (student) => (student.name || "").toLowerCase() === nombre.toLowerCase()
+      );
+
+      if (exists) {
+        toast("Ya existe un estudiante con ese nombre.");
+        return;
+      }
+
+      const studentPayload = {
+        id: cryptoRandom(),
+        name: nombre,
+        level: nivel,
+        monthlyFee: mensualidad,
+        dueDay,
+        status: "Activo",
+        contact: studentType === "nino" ? guardianPhone : "",
+        notes,
+        studentType,
+        motherName,
+        guardianPhone,
+        assignedTeacher: docente,
+        paymentDate,
+        materialFee: materialNio,
+        materialCurrency: "NIO",
+        enrollmentDate: todayValue()
+      };
+
+      data.students.unshift(studentPayload);
+      saveData(data);
+
+      latestEnrollmentReceipt = {
+        studentName: nombre,
+        level: nivel,
+        assignedTeacher: docente,
+        monthlyFeeUsd: mensualidad,
+        materialFeeNio: materialNio,
+        paymentDate,
+        dueDay,
+        studentType,
+        motherName,
+        guardianPhone,
+        notes,
+        generatedAt: new Date().toISOString()
+      };
+
+      if (receiptPreview) {
+        receiptPreview.innerHTML = buildEnrollmentReceiptPreview(latestEnrollmentReceipt);
+      }
+
+      toast("Matrícula guardada correctamente. El estudiante ya aparece en la sección Estudiantes.");
+
+      form.reset();
+      if (form.elements["paymentDate"]) {
+        form.elements["paymentDate"].value = todayValue();
+      }
+      toggleDependentFields();
+      fillEnrollmentTeacherSelect(teacherSelect, data);
+    });
+  }
+
+  if (downloadButton) {
+    downloadButton.addEventListener("click", () => {
+      if (!latestEnrollmentReceipt) {
+        toast("Primero genera una matrícula para descargar el comprobante.");
+        return;
+      }
+
+      generateEnrollmentReceiptPDF(latestEnrollmentReceipt);
+    });
+  }
+}
+
+function fillEnrollmentTeacherSelect(select, data) {
+  if (!select) return;
+
+  const teacherMap = new Map();
+
+  data.teachers.forEach((teacher) => {
+    if ((teacher.status || "Activo") === "Activo" && teacher.name) {
+      teacherMap.set(teacher.name.toLowerCase(), teacher.name);
+    }
+  });
+
+  data.teacherPayments.forEach((payment) => {
+    const name = (payment.teacher || "").trim();
+    if (name) {
+      const key = name.toLowerCase();
+      if (!teacherMap.has(key)) {
+        teacherMap.set(key, name);
+      }
+    }
+  });
+
+  const teacherNames = Array.from(teacherMap.values()).sort((a, b) => a.localeCompare(b, "es"));
+
+  select.innerHTML = teacherNames.length
+    ? `<option value="">Selecciona un docente</option>${teacherNames.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}`
+    : `<option value="">Primero registra un maestro</option>`;
+}
+
+function buildEnrollmentReceiptPreview(receipt) {
+  return `
+    <div class="mini-stat-card">
+      <span>Estudiante</span>
+      <strong>${escapeHtml(receipt.studentName)}</strong>
+      <small>Nivel: ${escapeHtml(receipt.level)}</small>
+      <small>Docente asignado: ${escapeHtml(receipt.assignedTeacher)}</small>
+      <small>Fecha de pago: ${formatDate(receipt.paymentDate)}</small>
+      <small>Due date: día ${receipt.dueDay}</small>
+      <small>Mensualidad: ${formatCurrency(receipt.monthlyFeeUsd)}</small>
+      <small>Material: ${formatOriginalCurrency(receipt.materialFeeNio, "NIO")}</small>
+      <small>Tipo: ${receipt.studentType === "nino" ? "Niño" : "Adulto"}</small>
+      ${receipt.studentType === "nino" ? `<small>Mamá: ${escapeHtml(receipt.motherName)}</small>` : ""}
+      ${receipt.studentType === "nino" ? `<small>Teléfono: ${escapeHtml(receipt.guardianPhone)}</small>` : ""}
+    </div>
+  `;
+}
+
+function generateEnrollmentReceiptPDF(receipt) {
+  const safeStudentName = sanitizeFileName(receipt.studentName || "estudiante");
+  const safeDate = (receipt.paymentDate || todayValue()).replaceAll("-", "_");
+  const documentTitle = `Matricula_${safeStudentName}_${safeDate}`;
+
+  const receiptWindow = window.open("", "_blank", "width=920,height=1100");
+  if (!receiptWindow) {
+    toast("Tu navegador bloqueó la ventana del comprobante.");
+    return;
+  }
+
+  receiptWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8" />
+      <title>${documentTitle}</title>
+      <style>
+        * { box-sizing: border-box; }
+        body {
+          margin: 0;
+          font-family: "Segoe UI", Arial, sans-serif;
+          background: #eef3f8;
+          color: #10233b;
+          padding: 32px;
+        }
+        .receipt-sheet {
+          max-width: 880px;
+          margin: 0 auto;
+          background: #ffffff;
+          border-radius: 24px;
+          overflow: hidden;
+          box-shadow: 0 24px 60px rgba(16, 35, 59, 0.18);
+          border: 1px solid rgba(16, 35, 59, 0.08);
+        }
+        .receipt-top {
+          background: linear-gradient(135deg, #0e2238, #18457c 60%, #2f6fd0);
+          color: white;
+          padding: 36px;
+          display: flex;
+          justify-content: space-between;
+          gap: 24px;
+          align-items: center;
+        }
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 18px;
+        }
+        .brand img {
+          width: 92px;
+          height: 92px;
+          object-fit: cover;
+          background: rgba(255,255,255,0.12);
+          border-radius: 18px;
+          padding: 6px;
+        }
+        .brand h1 {
+          margin: 0 0 6px;
+          font-size: 1.7rem;
+        }
+        .brand p {
+          margin: 0;
+          opacity: 0.9;
+        }
+        .receipt-body {
+          padding: 34px;
+        }
+        .detail-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 18px;
+          margin-bottom: 24px;
+        }
+        .detail-card {
+          border: 1px solid rgba(16, 35, 59, 0.08);
+          border-radius: 18px;
+          padding: 18px;
+          background: #fbfdff;
+        }
+        .detail-card span {
+          display: block;
+          font-size: 0.8rem;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          color: #6d7f94;
+          margin-bottom: 8px;
+        }
+        .detail-card strong {
+          display: block;
+          font-size: 1.08rem;
+          color: #10233b;
+        }
+        .amount-box {
+          margin-top: 10px;
+          background: linear-gradient(135deg, #0f2742, #173e6c);
+          color: white;
+          border-radius: 22px;
+          padding: 24px;
+        }
+        .amount-box span {
+          display: block;
+          opacity: 0.8;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          font-size: 0.82rem;
+          margin-bottom: 10px;
+        }
+        .amount-box strong {
+          font-size: 2.3rem;
+          display: block;
+          margin-bottom: 8px;
+        }
+        .amount-box small {
+          opacity: 0.86;
+          display: block;
+        }
+        .print-actions {
+          max-width: 880px;
+          margin: 18px auto 0;
+          display: flex;
+          justify-content: flex-end;
+          gap: 12px;
+        }
+        .print-actions button {
+          border: 0;
+          border-radius: 12px;
+          padding: 12px 16px;
+          cursor: pointer;
+          font-size: 0.95rem;
+        }
+        .btn-print {
+          background: #1e4f92;
+          color: white;
+        }
+        .btn-close {
+          background: #dfe8f2;
+          color: #10233b;
+        }
+        @media print {
+          body {
+            background: white;
+            padding: 0;
+          }
+          .print-actions {
+            display: none;
+          }
+          .receipt-sheet {
+            box-shadow: none;
+            border: none;
+            border-radius: 0;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="receipt-sheet">
+        <div class="receipt-top">
+          <div class="brand">
+            <img src="foto8.jpg.jpg" alt="Logo Academia" />
+            <div>
+              <h1>Expressive English Academy</h1>
+              <p>Comprobante de matrícula</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="receipt-body">
+          <div class="detail-grid">
+            <div class="detail-card">
+              <span>Estudiante</span>
+              <strong>${escapeHtml(receipt.studentName)}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Nivel</span>
+              <strong>${escapeHtml(receipt.level)}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Docente asignado</span>
+              <strong>${escapeHtml(receipt.assignedTeacher)}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Fecha de pago</span>
+              <strong>${formatDate(receipt.paymentDate)}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Due date</span>
+              <strong>Día ${receipt.dueDay}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Tipo de estudiante</span>
+              <strong>${receipt.studentType === "nino" ? "Niño" : "Adulto"}</strong>
+            </div>
+
+            ${receipt.studentType === "nino" ? `
+              <div class="detail-card">
+                <span>Nombre de la mamá</span>
+                <strong>${escapeHtml(receipt.motherName)}</strong>
+              </div>
+
+              <div class="detail-card">
+                <span>Teléfono</span>
+                <strong>${escapeHtml(receipt.guardianPhone)}</strong>
+              </div>
+            ` : ""}
+
+            <div class="detail-card">
+              <span>Mensualidad</span>
+              <strong>${formatCurrency(receipt.monthlyFeeUsd)}</strong>
+            </div>
+
+            <div class="detail-card">
+              <span>Material</span>
+              <strong>${formatOriginalCurrency(receipt.materialFeeNio, "NIO")}</strong>
+            </div>
+          </div>
+
+          <div class="amount-box">
+            <span>Montos iniciales</span>
+            <strong>${formatCurrency(receipt.monthlyFeeUsd)}</strong>
+            <small>Mensualidad en USD</small>
+            <small>${formatOriginalCurrency(receipt.materialFeeNio, "NIO")} de material en córdobas</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="print-actions">
+        <button class="btn-close" onclick="window.close()">Cerrar</button>
+        <button class="btn-print" onclick="window.print()">Descargar / Guardar PDF</button>
+      </div>
+    </body>
+    </html>
+  `);
+
+  receiptWindow.document.close();
 }
 
 function renderIncomesPage(data) {
@@ -2288,6 +2715,10 @@ function downloadCurrentMonthReport(data, studentStats) {
   const expenses = data.expenses.filter((item) => isSameMonth(item.date, month, year));
   const teachers = data.teacherPayments.filter((item) => isSameMonth(item.date, month, year));
   const investments = data.investments.filter((item) => isSameMonth(item.date, month, year));
+  const enrollments = data.students.filter((item) => {
+    const referenceDate = item.enrollmentDate || item.paymentDate || "";
+    return referenceDate && isSameMonth(referenceDate, month, year);
+  });
 
   const rows = [
     ["Reporte mensual", monthLabel],
@@ -2299,6 +2730,20 @@ function downloadCurrentMonthReport(data, studentStats) {
     ["Al día", studentStats.onTime],
     ["Pendientes", studentStats.pending],
     ["Retrasados", studentStats.late],
+    [],
+    ["Matriculas"],
+    ["Fecha matrícula", "Fecha pago", "Estudiante", "Nivel", "Docente", "Tipo", "Mensualidad USD", "Material C$", "Due date"],
+    ...enrollments.map((item) => [
+      item.enrollmentDate || "",
+      item.paymentDate || "",
+      item.name || "",
+      item.level || "",
+      item.assignedTeacher || "",
+      item.studentType === "nino" ? "Niño" : "Adulto",
+      item.monthlyFee || 0,
+      item.materialFee || 0,
+      item.dueDay || ""
+    ]),
     [],
     ["Ingresos"],
     ["Fecha", "Estudiante", "Nivel", "Concepto", "Categoría", "Método", "Moneda", "Monto original", "Tasa", "Monto USD", "Cuenta"],
@@ -2453,8 +2898,9 @@ function sanitizeFileName(text) {
 }
 
 function isSameMonth(dateString, month, year) {
+  if (!dateString) return false;
   const date = new Date(`${dateString}T00:00:00`);
-  return date.getMonth() === month && date.getFullYear() === year;
+  return !Number.isNaN(date.getTime()) && date.getMonth() === month && date.getFullYear() === year;
 }
 
 function capitalize(text) {
