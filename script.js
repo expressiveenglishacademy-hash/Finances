@@ -425,6 +425,12 @@ function renderStudentsPage(data) {
             <button class="btn btn-secondary btn-sm" data-edit-due-date="${student.id}">
               Cambiar fecha
             </button>
+            <button class="btn btn-secondary btn-sm" data-edit-student="${student.id}">
+              Editar
+            </button>
+            <button class="btn btn-secondary btn-sm" data-delete-student="${student.id}">
+              Borrar
+            </button>
           </td>
         </tr>
       `).join("")
@@ -432,6 +438,8 @@ function renderStudentsPage(data) {
   }
 
   bindStudentDueDateButtons(data);
+  bindEditStudentButtons(data);
+  bindDeleteStudentButtons(data);
 }
 
 function bindStudentDueDateButtons(data) {
@@ -464,12 +472,131 @@ function bindStudentDueDateButtons(data) {
   });
 }
 
+function bindEditStudentButtons(data) {
+  document.querySelectorAll("[data-edit-student]").forEach((button) => {
+    button.onclick = () => {
+      const studentId = button.getAttribute("data-edit-student");
+      const student = data.students.find((item) => item.id === studentId);
+
+      if (!student) return;
+
+      const newName = window.prompt("Editar nombre del estudiante:", student.name || "");
+      if (newName === null) return;
+
+      const cleanName = newName.trim();
+      if (!cleanName) {
+        toast("El nombre no puede quedar vacío.");
+        return;
+      }
+
+      const duplicated = data.students.some(
+        (item) => item.id !== student.id && (item.name || "").toLowerCase() === cleanName.toLowerCase()
+      );
+
+      if (duplicated) {
+        toast("Ya existe otro estudiante con ese nombre.");
+        return;
+      }
+
+      const newLevel = window.prompt("Editar nivel:", student.level || "");
+      if (newLevel === null) return;
+
+      const monthlyDefault = student.monthlyFee ?? 0;
+      const newMonthlyFee = window.prompt("Editar mensualidad (USD):", String(monthlyDefault));
+      if (newMonthlyFee === null) return;
+
+      const parsedMonthlyFee = Number(newMonthlyFee);
+      if (!parsedMonthlyFee || parsedMonthlyFee <= 0) {
+        toast("La mensualidad debe ser mayor que 0.");
+        return;
+      }
+
+      const dueDefault = student.dueDay ?? 1;
+      const newDueDay = window.prompt("Editar due date (1 al 31):", String(dueDefault));
+      if (newDueDay === null) return;
+
+      const parsedDueDay = Number(newDueDay);
+      if (!Number.isInteger(parsedDueDay) || parsedDueDay < 1 || parsedDueDay > 31) {
+        toast("El due date debe ser un número entre 1 y 31.");
+        return;
+      }
+
+      const newStatus = window.prompt("Editar estado (Activo o Inactivo):", student.status || "Activo");
+      if (newStatus === null) return;
+
+      const cleanStatus = newStatus.trim() || "Activo";
+
+      const newContact = window.prompt("Editar contacto:", student.contact || "");
+      if (newContact === null) return;
+
+      const newNotes = window.prompt("Editar notas:", student.notes || "");
+      if (newNotes === null) return;
+
+      const oldName = student.name;
+
+      student.name = cleanName;
+      student.level = newLevel.trim();
+      student.monthlyFee = parsedMonthlyFee;
+      student.dueDay = parsedDueDay;
+      student.status = cleanStatus;
+      student.contact = newContact.trim();
+      student.notes = newNotes.trim();
+
+      data.incomes.forEach((income) => {
+        if ((income.student || "").toLowerCase() === (oldName || "").toLowerCase()) {
+          income.student = cleanName;
+          if (!income.level && student.level) {
+            income.level = student.level;
+          }
+        }
+      });
+
+      saveData(data);
+      toast("Estudiante actualizado correctamente.");
+      setTimeout(() => window.location.reload(), 300);
+    };
+  });
+}
+
+function bindDeleteStudentButtons(data) {
+  document.querySelectorAll("[data-delete-student]").forEach((button) => {
+    button.onclick = () => {
+      const studentId = button.getAttribute("data-delete-student");
+      const student = data.students.find((item) => item.id === studentId);
+
+      if (!student) return;
+
+      const confirmed = window.confirm(
+        `Se eliminará el estudiante ${student.name}. ¿Deseas continuar?`
+      );
+      if (!confirmed) return;
+      if (!confirmDelete()) return;
+
+      data.students = data.students.filter((item) => item.id !== studentId);
+
+      saveData(data);
+      toast("Estudiante eliminado correctamente.");
+      setTimeout(() => window.location.reload(), 300);
+    };
+  });
+}
+
 function renderEnrollmentPage(data) {
   ensureTeacherCatalog(data);
 
   const form = document.getElementById("matriculaForm");
-  const teacherSelect = document.getElementById("matriculaTeacherSelect");
-  const studentTypeSelect = document.getElementById("studentTypeSelect");
+  if (!form) return;
+
+  const teacherSelect =
+    document.getElementById("matriculaTeacherSelect") ||
+    form.querySelector('select[name="docente"]') ||
+    null;
+
+  const studentTypeSelect =
+    document.getElementById("studentTypeSelect") ||
+    form.elements["studentType"] ||
+    null;
+
   const motherNameField = document.getElementById("motherNameField");
   const guardianPhoneField = document.getElementById("guardianPhoneField");
   const receiptPreview = document.getElementById("receiptPreview");
@@ -479,19 +606,19 @@ function renderEnrollmentPage(data) {
 
   fillEnrollmentTeacherSelect(teacherSelect, data);
 
-  if (form?.elements["paymentDate"]) {
+  if (form.elements["paymentDate"]) {
     form.elements["paymentDate"].value = todayValue();
   }
 
   const toggleDependentFields = () => {
-    const isChild = studentTypeSelect?.value === "nino";
+    const isChild = (studentTypeSelect?.value || "adulto") === "nino";
 
-    if (motherNameField?.querySelector("input")) {
+    if (motherNameField && motherNameField.querySelector("input")) {
       motherNameField.classList.toggle("hidden-field", !isChild);
       motherNameField.querySelector("input").required = isChild;
     }
 
-    if (guardianPhoneField?.querySelector("input")) {
+    if (guardianPhoneField && guardianPhoneField.querySelector("input")) {
       guardianPhoneField.classList.toggle("hidden-field", !isChild);
       guardianPhoneField.querySelector("input").required = isChild;
     }
@@ -503,92 +630,90 @@ function renderEnrollmentPage(data) {
     studentTypeSelect.addEventListener("change", toggleDependentFields);
   }
 
-  if (form) {
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
 
-      const studentType = form.elements["studentType"]?.value || "adulto";
-      const nombre = form.elements["nombre"]?.value.trim() || "";
-      const nivel = form.elements["nivel"]?.value.trim() || "";
-      const docente = form.elements["docente"]?.value.trim() || "";
-      const mensualidad = Number(form.elements["mensualidad"]?.value || 0);
-      const materialNio = Number(form.elements["materialNio"]?.value || form.elements["material"]?.value || 0);
-      const paymentDate = form.elements["paymentDate"]?.value || todayValue();
-      const dueDay = Number(form.elements["dueDay"]?.value || 1);
-      const motherName = form.elements["motherName"]?.value.trim() || "";
-      const guardianPhone = form.elements["guardianPhone"]?.value.trim() || "";
-      const notes = form.elements["notes"]?.value.trim() || "";
+    const studentType = form.elements["studentType"]?.value || "adulto";
+    const nombre = form.elements["nombre"]?.value.trim() || "";
+    const nivel = form.elements["nivel"]?.value.trim() || "";
+    const docente = form.elements["docente"]?.value.trim() || teacherSelect?.value.trim() || "";
+    const mensualidad = Number(form.elements["mensualidad"]?.value || 0);
+    const materialNio = Number(form.elements["materialNio"]?.value || form.elements["material"]?.value || 0);
+    const paymentDate = form.elements["paymentDate"]?.value || todayValue();
+    const dueDay = Number(form.elements["dueDay"]?.value || 1);
+    const motherName = form.elements["motherName"]?.value.trim() || "";
+    const guardianPhone = form.elements["guardianPhone"]?.value.trim() || "";
+    const notes = form.elements["notes"]?.value.trim() || "";
 
-      if (!nombre || !nivel || !docente || mensualidad <= 0 || materialNio < 0 || !paymentDate || dueDay < 1 || dueDay > 31) {
-        toast("Completa correctamente todos los campos obligatorios.");
-        return;
-      }
+    if (!nombre || !nivel || !docente || mensualidad <= 0 || materialNio < 0 || !paymentDate || dueDay < 1 || dueDay > 31) {
+      toast("Completa correctamente todos los campos obligatorios.");
+      return;
+    }
 
-      if (studentType === "nino" && (!motherName || !guardianPhone)) {
-        toast("Para estudiantes niños debes agregar nombre de la mamá y teléfono.");
-        return;
-      }
+    if (studentType === "nino" && (!motherName || !guardianPhone)) {
+      toast("Para estudiantes niños debes agregar nombre de la mamá y teléfono.");
+      return;
+    }
 
-      const exists = data.students.some(
-        (student) => (student.name || "").toLowerCase() === nombre.toLowerCase()
-      );
+    const exists = data.students.some(
+      (student) => (student.name || "").toLowerCase() === nombre.toLowerCase()
+    );
 
-      if (exists) {
-        toast("Ya existe un estudiante con ese nombre.");
-        return;
-      }
+    if (exists) {
+      toast("Ya existe un estudiante con ese nombre.");
+      return;
+    }
 
-      const studentPayload = {
-        id: cryptoRandom(),
-        name: nombre,
-        level: nivel,
-        monthlyFee: mensualidad,
-        dueDay,
-        status: "Activo",
-        contact: studentType === "nino" ? guardianPhone : "",
-        notes,
-        studentType,
-        motherName,
-        guardianPhone,
-        assignedTeacher: docente,
-        paymentDate,
-        materialFee: materialNio,
-        materialCurrency: "NIO",
-        enrollmentDate: todayValue()
-      };
+    const studentPayload = {
+      id: cryptoRandom(),
+      name: nombre,
+      level: nivel,
+      monthlyFee: mensualidad,
+      dueDay,
+      status: "Activo",
+      contact: studentType === "nino" ? guardianPhone : "",
+      notes,
+      studentType,
+      motherName,
+      guardianPhone,
+      assignedTeacher: docente,
+      paymentDate,
+      materialFee: materialNio,
+      materialCurrency: "NIO",
+      enrollmentDate: todayValue()
+    };
 
-      data.students.unshift(studentPayload);
-      saveData(data);
+    data.students.unshift(studentPayload);
+    saveData(data);
 
-      latestEnrollmentReceipt = {
-        studentName: nombre,
-        level: nivel,
-        assignedTeacher: docente,
-        monthlyFeeUsd: mensualidad,
-        materialFeeNio: materialNio,
-        paymentDate,
-        dueDay,
-        studentType,
-        motherName,
-        guardianPhone,
-        notes,
-        generatedAt: new Date().toISOString()
-      };
+    latestEnrollmentReceipt = {
+      studentName: nombre,
+      level: nivel,
+      assignedTeacher: docente,
+      monthlyFeeUsd: mensualidad,
+      materialFeeNio: materialNio,
+      paymentDate,
+      dueDay,
+      studentType,
+      motherName,
+      guardianPhone,
+      notes,
+      generatedAt: new Date().toISOString()
+    };
 
-      if (receiptPreview) {
-        receiptPreview.innerHTML = buildEnrollmentReceiptPreview(latestEnrollmentReceipt);
-      }
+    if (receiptPreview) {
+      receiptPreview.innerHTML = buildEnrollmentReceiptPreview(latestEnrollmentReceipt);
+    }
 
-      toast("Matrícula guardada correctamente. El estudiante ya aparece en la sección Estudiantes.");
+    toast("Matrícula guardada correctamente. El estudiante ya aparece en la sección Estudiantes.");
 
-      form.reset();
-      if (form.elements["paymentDate"]) {
-        form.elements["paymentDate"].value = todayValue();
-      }
-      toggleDependentFields();
-      fillEnrollmentTeacherSelect(teacherSelect, data);
-    });
-  }
+    form.reset();
+    if (form.elements["paymentDate"]) {
+      form.elements["paymentDate"].value = todayValue();
+    }
+    fillEnrollmentTeacherSelect(teacherSelect, data);
+    toggleDependentFields();
+  });
 
   if (downloadButton) {
     downloadButton.addEventListener("click", () => {
@@ -607,19 +732,19 @@ function fillEnrollmentTeacherSelect(select, data) {
 
   const teacherMap = new Map();
 
-  data.teachers.forEach((teacher) => {
-    if ((teacher.status || "Activo") === "Activo" && teacher.name) {
-      teacherMap.set(teacher.name.toLowerCase(), teacher.name);
+  (data.teachers || []).forEach((teacher) => {
+    const name = (teacher.name || "").trim();
+    if (!name) return;
+    if ((teacher.status || "Activo") === "Activo") {
+      teacherMap.set(name.toLowerCase(), name);
     }
   });
 
-  data.teacherPayments.forEach((payment) => {
+  (data.teacherPayments || []).forEach((payment) => {
     const name = (payment.teacher || "").trim();
-    if (name) {
-      const key = name.toLowerCase();
-      if (!teacherMap.has(key)) {
-        teacherMap.set(key, name);
-      }
+    if (!name) return;
+    if (!teacherMap.has(name.toLowerCase())) {
+      teacherMap.set(name.toLowerCase(), name);
     }
   });
 
