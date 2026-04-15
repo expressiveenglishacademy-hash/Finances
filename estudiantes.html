@@ -20,6 +20,7 @@
       <nav class="sidebar-nav">
         <a href="index.html" class="nav-link">Inicio / Dashboard</a>
         <a href="estudiantes.html" class="nav-link active">Estudiantes</a>
+        <a href="matricula.html" class="nav-link">Matrícula</a>
         <a href="ingresos.html" class="nav-link">Ingresos</a>
         <a href="historial-pagos.html" class="nav-link">Historial de pagos</a>
         <a href="gastos.html" class="nav-link">Gastos</a>
@@ -30,58 +31,84 @@
       </nav>
 
       <div class="sidebar-footer glass-card">
-        <span class="eyebrow">Control estudiantil</span>
-        <p>Puedes registrar alumnos, revisar pagos y ajustar la fecha de vencimiento cuando sea necesario.</p>
+        <span class="eyebrow">Caja actual</span>
+        <strong id="sidebarCaja">$0.00</strong>
+        <p>Resumen general de la academia.</p>
       </div>
     </aside>
 
     <div class="main-layout">
       <header class="topbar">
         <div>
-          <span class="eyebrow">Gestión de alumnos</span>
+          <span class="eyebrow">Gestión académica</span>
           <h1>Estudiantes</h1>
         </div>
 
         <div class="topbar-actions">
-          <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
           <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
         </div>
       </header>
 
       <main class="content-grid">
+        <section class="stats-grid">
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Activos</span>
+            <h3 id="studentsActiveCount">0</h3>
+            <p>Estudiantes actualmente inscritos.</p>
+          </article>
+
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Al día</span>
+            <h3 id="studentsOnTimeCount">0</h3>
+            <p>Mensualidades al día.</p>
+          </article>
+
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Pendientes</span>
+            <h3 id="studentsPendingCount">0</h3>
+            <p>Pagos pendientes este mes.</p>
+          </article>
+
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Retrasados</span>
+            <h3 id="studentsLateCount">0</h3>
+            <p>Pagos vencidos.</p>
+          </article>
+        </section>
+
         <section class="two-column">
           <article class="glass-card">
             <div class="panel-header">
               <div>
-                <span class="eyebrow">Nuevo estudiante</span>
-                <h2>Registrar estudiante</h2>
+                <span class="eyebrow">Nuevo registro</span>
+                <h2>Agregar estudiante</h2>
               </div>
             </div>
 
             <form id="studentForm" class="form-grid">
               <label class="field">
                 <span>Nombre</span>
-                <input type="text" name="name" placeholder="José Esteban" required />
+                <input type="text" name="name" required />
               </label>
 
               <label class="field">
                 <span>Nivel</span>
-                <input type="text" name="level" placeholder="Intermedio B1" required />
+                <input type="text" name="level" required />
               </label>
 
               <label class="field">
-                <span>Mensualidad</span>
+                <span>Mensualidad (USD)</span>
                 <input type="number" step="0.01" min="0" name="monthlyFee" required />
               </label>
 
               <label class="field">
-                <span>Due date / día de vencimiento</span>
-                <input type="number" min="1" max="31" name="dueDay" placeholder="5" required />
+                <span>Due date</span>
+                <input type="number" min="1" max="31" name="dueDay" required />
               </label>
 
               <label class="field">
                 <span>Estado</span>
-                <select name="status">
+                <select name="status" required>
                   <option value="Activo">Activo</option>
                   <option value="Inactivo">Inactivo</option>
                 </select>
@@ -89,12 +116,12 @@
 
               <label class="field">
                 <span>Contacto</span>
-                <input type="text" name="contact" placeholder="WhatsApp o teléfono" />
+                <input type="text" name="contact" />
               </label>
 
               <label class="field field-full">
                 <span>Notas</span>
-                <textarea name="notes" placeholder="Observaciones del estudiante"></textarea>
+                <textarea name="notes" placeholder="Observaciones"></textarea>
               </label>
 
               <button type="submit" class="btn btn-primary">Guardar estudiante</button>
@@ -104,44 +131,25 @@
           <article class="glass-card">
             <div class="panel-header">
               <div>
-                <span class="eyebrow">Resumen</span>
-                <h2>Estado de cobro</h2>
+                <span class="eyebrow">Resumen rápido</span>
+                <h2>Estado de pagos</h2>
               </div>
             </div>
 
-            <div class="stack-cards">
-              <div class="mini-stat-card">
-                <span>Activos</span>
-                <strong id="studentsActiveCount">0</strong>
-              </div>
-              <div class="mini-stat-card">
-                <span>Al día</span>
-                <strong id="studentsOnTimeCount">0</strong>
-              </div>
-              <div class="mini-stat-card">
-                <span>Pendientes</span>
-                <strong id="studentsPendingCount">0</strong>
-              </div>
-              <div class="mini-stat-card">
-                <span>Retrasados</span>
-                <strong id="studentsLateCount">0</strong>
-              </div>
-            </div>
-
-            <div id="studentsSummaryCards" class="stack-cards" style="margin-top: 18px;"></div>
+            <div id="studentsSummaryCards" class="stats-list"></div>
           </article>
         </section>
 
         <section class="glass-card">
           <div class="panel-header">
             <div>
-              <span class="eyebrow">Listado</span>
-              <h2>Estudiantes registrados</h2>
+              <span class="eyebrow">Listado completo</span>
+              <h2>Tabla de estudiantes</h2>
             </div>
           </div>
 
           <div class="table-wrap">
-            <table class="data-table">
+            <table>
               <thead>
                 <tr>
                   <th>Nombre</th>
@@ -153,10 +161,14 @@
                   <th>Pendiente</th>
                   <th>Estado de pago</th>
                   <th>Estado</th>
-                  <th>Cambiar due date</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
-              <tbody id="studentsTableBody"></tbody>
+              <tbody id="studentsTableBody">
+                <tr>
+                  <td colspan="10">Cargando estudiantes...</td>
+                </tr>
+              </tbody>
             </table>
           </div>
         </section>
