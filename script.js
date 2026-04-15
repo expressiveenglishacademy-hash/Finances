@@ -26,7 +26,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const handlers = {
     dashboard: () => renderDashboard(data),
     estudiantes: () => renderStudentsPage(data),
-    matricula: () => renderEnrollmentPage(data),
     ingresos: () => renderIncomesPage(data),
     historial: () => renderPaymentHistoryPage(data),
     gastos: () => renderExpensesPage(data),
@@ -119,7 +118,7 @@ function seedStorage() {
     expenseCategories: Array.isArray(parsed.expenseCategories) ? parsed.expenseCategories : base.expenseCategories,
     investmentCategories: Array.isArray(parsed.investmentCategories) ? parsed.investmentCategories : base.investmentCategories,
     accounts: Array.isArray(parsed.accounts) && parsed.accounts.length ? parsed.accounts : base.accounts,
-    students: normalizeStudents(Array.isArray(parsed.students) ? parsed.students : []),
+    students: Array.isArray(parsed.students) ? parsed.students : [],
     teachers: normalizeTeachers(Array.isArray(parsed.teachers) ? parsed.teachers : []),
     incomes: normalizeLegacyTimestamps(
       Array.isArray(parsed.incomes) ? parsed.incomes : [],
@@ -156,27 +155,6 @@ function seedStorage() {
   };
 
   saveData(merged);
-}
-
-function normalizeStudents(list) {
-  return list.map((item) => ({
-    id: item.id || cryptoRandom(),
-    name: item.name || "",
-    level: item.level || "",
-    monthlyFee: Number(item.monthlyFee || 0),
-    dueDay: Number(item.dueDay || 1),
-    status: item.status || "Activo",
-    contact: item.contact || "",
-    notes: item.notes || "",
-    studentType: item.studentType || "adulto",
-    motherName: item.motherName || "",
-    guardianPhone: item.guardianPhone || "",
-    assignedTeacher: item.assignedTeacher || "",
-    paymentDate: item.paymentDate || "",
-    materialFee: Number(item.materialFee || item.materialFeeUsd || 0),
-    materialCurrency: item.materialCurrency || "NIO",
-    enrollmentDate: item.enrollmentDate || ""
-  }));
 }
 
 function normalizeTeachers(list) {
@@ -383,15 +361,7 @@ function renderStudentsPage(data) {
         dueDay: Number(form.elements["dueDay"].value),
         status: form.elements["status"].value,
         contact: form.elements["contact"].value.trim(),
-        notes: form.elements["notes"].value.trim(),
-        studentType: "adulto",
-        motherName: "",
-        guardianPhone: "",
-        assignedTeacher: "",
-        paymentDate: "",
-        materialFee: 0,
-        materialCurrency: "NIO",
-        enrollmentDate: todayValue()
+        notes: form.elements["notes"].value.trim()
       };
 
       if (!payload.name || !payload.level || payload.monthlyFee <= 0 || payload.dueDay < 1 || payload.dueDay > 31) {
@@ -491,430 +461,6 @@ function bindStudentDueDateButtons(data) {
       setTimeout(() => window.location.reload(), 300);
     };
   });
-}
-
-function renderEnrollmentPage(data) {
-  ensureTeacherCatalog(data);
-
-  const form = document.getElementById("matriculaForm");
-  const teacherSelect = document.getElementById("matriculaTeacherSelect");
-  const studentTypeSelect = document.getElementById("studentTypeSelect");
-  const motherNameField = document.getElementById("motherNameField");
-  const guardianPhoneField = document.getElementById("guardianPhoneField");
-  const receiptPreview = document.getElementById("receiptPreview");
-  const downloadButton = document.getElementById("downloadReceipt");
-
-  let latestEnrollmentReceipt = null;
-
-  fillEnrollmentTeacherSelect(teacherSelect, data);
-
-  if (form?.elements["paymentDate"]) {
-    form.elements["paymentDate"].value = todayValue();
-  }
-
-  const toggleDependentFields = () => {
-    const isChild = studentTypeSelect?.value === "nino";
-
-    if (motherNameField) {
-      motherNameField.classList.toggle("hidden-field", !isChild);
-      motherNameField.querySelector("input").required = isChild;
-    }
-
-    if (guardianPhoneField) {
-      guardianPhoneField.classList.toggle("hidden-field", !isChild);
-      guardianPhoneField.querySelector("input").required = isChild;
-    }
-  };
-
-  toggleDependentFields();
-
-  if (studentTypeSelect) {
-    studentTypeSelect.addEventListener("change", toggleDependentFields);
-  }
-
-  if (form) {
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-
-      const studentType = form.elements["studentType"].value;
-      const nombre = form.elements["nombre"].value.trim();
-      const nivel = form.elements["nivel"].value.trim();
-      const docente = form.elements["docente"].value.trim();
-      const mensualidad = Number(form.elements["mensualidad"].value);
-      const materialNio = Number(form.elements["materialNio"].value);
-      const paymentDate = form.elements["paymentDate"].value;
-      const dueDay = Number(form.elements["dueDay"].value);
-      const motherName = form.elements["motherName"]?.value.trim() || "";
-      const guardianPhone = form.elements["guardianPhone"]?.value.trim() || "";
-      const notes = form.elements["notes"].value.trim();
-
-      if (!nombre || !nivel || !docente || mensualidad <= 0 || materialNio < 0 || !paymentDate || dueDay < 1 || dueDay > 31) {
-        toast("Completa correctamente todos los campos obligatorios.");
-        return;
-      }
-
-      if (studentType === "nino" && (!motherName || !guardianPhone)) {
-        toast("Para estudiantes niños debes agregar nombre de la mamá y teléfono.");
-        return;
-      }
-
-      const exists = data.students.some(
-        (student) => student.name.toLowerCase() === nombre.toLowerCase()
-      );
-
-      if (exists) {
-        toast("Ya existe un estudiante con ese nombre.");
-        return;
-      }
-
-      const studentPayload = {
-        id: cryptoRandom(),
-        name: nombre,
-        level: nivel,
-        monthlyFee: mensualidad,
-        dueDay,
-        status: "Activo",
-        contact: studentType === "nino" ? guardianPhone : "",
-        notes,
-        studentType,
-        motherName,
-        guardianPhone,
-        assignedTeacher: docente,
-        paymentDate,
-        materialFee: materialNio,
-        materialCurrency: "NIO",
-        enrollmentDate: todayValue()
-      };
-
-      data.students.unshift(studentPayload);
-      saveData(data);
-
-      latestEnrollmentReceipt = {
-        studentName: nombre,
-        level: nivel,
-        assignedTeacher: docente,
-        monthlyFeeUsd: mensualidad,
-        materialFeeNio: materialNio,
-        paymentDate,
-        dueDay,
-        studentType,
-        motherName,
-        guardianPhone,
-        notes,
-        generatedAt: new Date().toISOString()
-      };
-
-      if (receiptPreview) {
-        receiptPreview.innerHTML = buildEnrollmentReceiptPreview(latestEnrollmentReceipt);
-      }
-
-      toast("Matrícula guardada correctamente. El estudiante ya aparece en la sección Estudiantes.");
-      form.reset();
-      if (form.elements["paymentDate"]) {
-        form.elements["paymentDate"].value = todayValue();
-      }
-      toggleDependentFields();
-      fillEnrollmentTeacherSelect(teacherSelect, data);
-    });
-  }
-
-  if (downloadButton) {
-    downloadButton.addEventListener("click", () => {
-      if (!latestEnrollmentReceipt) {
-        toast("Primero genera una matrícula para descargar el comprobante.");
-        return;
-      }
-
-      generateEnrollmentReceiptPDF(latestEnrollmentReceipt);
-    });
-  }
-}
-
-function fillEnrollmentTeacherSelect(select, data) {
-  if (!select) return;
-
-  const names = new Map();
-
-  (data.teachers || []).forEach((teacher) => {
-    if ((teacher.status || "Activo") === "Activo" && teacher.name) {
-      names.set(teacher.name.toLowerCase(), teacher.name);
-    }
-  });
-
-  (data.teacherPayments || []).forEach((payment) => {
-    if (payment.teacher) {
-      const key = payment.teacher.toLowerCase();
-      if (!names.has(key)) {
-        names.set(key, payment.teacher);
-      }
-    }
-  });
-
-  const sortedNames = Array.from(names.values()).sort((a, b) => a.localeCompare(b, "es"));
-
-  select.innerHTML = sortedNames.length
-    ? `<option value="">Selecciona un docente</option>${sortedNames.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}`
-    : `<option value="">Primero registra un docente en maestros</option>`;
-}
-
-function buildEnrollmentReceiptPreview(receipt) {
-  return `
-    <div class="mini-stat-card">
-      <span>Estudiante</span>
-      <strong>${escapeHtml(receipt.studentName)}</strong>
-      <small>Nivel: ${escapeHtml(receipt.level)}</small>
-      <small>Docente asignado: ${escapeHtml(receipt.assignedTeacher)}</small>
-      <small>Fecha de pago: ${formatDate(receipt.paymentDate)}</small>
-      <small>Due date: día ${receipt.dueDay}</small>
-      <small>Mensualidad: ${formatCurrency(receipt.monthlyFeeUsd)}</small>
-      <small>Material: ${formatOriginalCurrency(receipt.materialFeeNio, "NIO")}</small>
-      <small>Tipo: ${receipt.studentType === "nino" ? "Niño" : "Adulto"}</small>
-      ${receipt.studentType === "nino" ? `<small>Mamá: ${escapeHtml(receipt.motherName)}</small>` : ""}
-      ${receipt.studentType === "nino" ? `<small>Teléfono: ${escapeHtml(receipt.guardianPhone)}</small>` : ""}
-    </div>
-  `;
-}
-
-function generateEnrollmentReceiptPDF(receipt) {
-  const safeStudentName = sanitizeFileName(receipt.studentName || "estudiante");
-  const safeDate = (receipt.paymentDate || todayValue()).replaceAll("-", "_");
-  const documentTitle = `Matricula_${safeStudentName}_${safeDate}`;
-
-  const receiptWindow = window.open("", "_blank", "width=920,height=1100");
-  if (!receiptWindow) {
-    toast("Tu navegador bloqueó la ventana del comprobante.");
-    return;
-  }
-
-  receiptWindow.document.write(`
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-      <meta charset="UTF-8" />
-      <title>${documentTitle}</title>
-      <style>
-        * { box-sizing: border-box; }
-        body {
-          margin: 0;
-          font-family: "Segoe UI", Arial, sans-serif;
-          background: #eef3f8;
-          color: #10233b;
-          padding: 32px;
-        }
-        .receipt-sheet {
-          max-width: 880px;
-          margin: 0 auto;
-          background: #ffffff;
-          border-radius: 24px;
-          overflow: hidden;
-          box-shadow: 0 24px 60px rgba(16, 35, 59, 0.18);
-          border: 1px solid rgba(16, 35, 59, 0.08);
-        }
-        .receipt-top {
-          background: linear-gradient(135deg, #0e2238, #18457c 60%, #2f6fd0);
-          color: white;
-          padding: 36px;
-          display: flex;
-          justify-content: space-between;
-          gap: 24px;
-          align-items: center;
-        }
-        .brand {
-          display: flex;
-          align-items: center;
-          gap: 18px;
-        }
-        .brand img {
-          width: 92px;
-          height: 92px;
-          object-fit: cover;
-          background: rgba(255,255,255,0.12);
-          border-radius: 18px;
-          padding: 6px;
-        }
-        .brand h1 {
-          margin: 0 0 6px;
-          font-size: 1.7rem;
-        }
-        .brand p {
-          margin: 0;
-          opacity: 0.9;
-        }
-        .receipt-body {
-          padding: 34px;
-        }
-        .detail-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 18px;
-          margin-bottom: 24px;
-        }
-        .detail-card {
-          border: 1px solid rgba(16, 35, 59, 0.08);
-          border-radius: 18px;
-          padding: 18px;
-          background: #fbfdff;
-        }
-        .detail-card span {
-          display: block;
-          font-size: 0.8rem;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          color: #6d7f94;
-          margin-bottom: 8px;
-        }
-        .detail-card strong {
-          display: block;
-          font-size: 1.08rem;
-          color: #10233b;
-        }
-        .amount-box {
-          margin-top: 10px;
-          background: linear-gradient(135deg, #0f2742, #173e6c);
-          color: white;
-          border-radius: 22px;
-          padding: 24px;
-        }
-        .amount-box span {
-          display: block;
-          opacity: 0.8;
-          text-transform: uppercase;
-          letter-spacing: 0.14em;
-          font-size: 0.82rem;
-          margin-bottom: 10px;
-        }
-        .amount-box strong {
-          font-size: 2.3rem;
-          display: block;
-          margin-bottom: 8px;
-        }
-        .amount-box small {
-          opacity: 0.86;
-          display: block;
-        }
-        .print-actions {
-          max-width: 880px;
-          margin: 18px auto 0;
-          display: flex;
-          justify-content: flex-end;
-          gap: 12px;
-        }
-        .print-actions button {
-          border: 0;
-          border-radius: 12px;
-          padding: 12px 16px;
-          cursor: pointer;
-          font-size: 0.95rem;
-        }
-        .btn-print {
-          background: #1e4f92;
-          color: white;
-        }
-        .btn-close {
-          background: #dfe8f2;
-          color: #10233b;
-        }
-        @media print {
-          body {
-            background: white;
-            padding: 0;
-          }
-          .print-actions {
-            display: none;
-          }
-          .receipt-sheet {
-            box-shadow: none;
-            border: none;
-            border-radius: 0;
-          }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="receipt-sheet">
-        <div class="receipt-top">
-          <div class="brand">
-            <img src="foto8.jpg.jpg" alt="Logo Academia" />
-            <div>
-              <h1>Expressive English Academy</h1>
-              <p>Comprobante de matrícula</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="receipt-body">
-          <div class="detail-grid">
-            <div class="detail-card">
-              <span>Estudiante</span>
-              <strong>${escapeHtml(receipt.studentName)}</strong>
-            </div>
-
-            <div class="detail-card">
-              <span>Nivel</span>
-              <strong>${escapeHtml(receipt.level)}</strong>
-            </div>
-
-            <div class="detail-card">
-              <span>Docente asignado</span>
-              <strong>${escapeHtml(receipt.assignedTeacher)}</strong>
-            </div>
-
-            <div class="detail-card">
-              <span>Fecha de pago</span>
-              <strong>${formatDate(receipt.paymentDate)}</strong>
-            </div>
-
-            <div class="detail-card">
-              <span>Due date</span>
-              <strong>Día ${receipt.dueDay}</strong>
-            </div>
-
-            <div class="detail-card">
-              <span>Tipo de estudiante</span>
-              <strong>${receipt.studentType === "nino" ? "Niño" : "Adulto"}</strong>
-            </div>
-
-            ${receipt.studentType === "nino" ? `
-              <div class="detail-card">
-                <span>Nombre de la mamá</span>
-                <strong>${escapeHtml(receipt.motherName)}</strong>
-              </div>
-
-              <div class="detail-card">
-                <span>Teléfono</span>
-                <strong>${escapeHtml(receipt.guardianPhone)}</strong>
-              </div>
-            ` : ""}
-
-            <div class="detail-card">
-              <span>Mensualidad</span>
-              <strong>${formatCurrency(receipt.monthlyFeeUsd)}</strong>
-            </div>
-
-            <div class="detail-card">
-              <span>Material</span>
-              <strong>${formatOriginalCurrency(receipt.materialFeeNio, "NIO")}</strong>
-            </div>
-          </div>
-
-          <div class="amount-box">
-            <span>Montos iniciales</span>
-            <strong>${formatCurrency(receipt.monthlyFeeUsd)}</strong>
-            <small>Mensualidad en USD</small>
-            <small>${formatOriginalCurrency(receipt.materialFeeNio, "NIO")} de material en córdobas</small>
-          </div>
-        </div>
-      </div>
-
-      <div class="print-actions">
-        <button class="btn-close" onclick="window.close()">Cerrar</button>
-        <button class="btn-print" onclick="window.print()">Descargar / Guardar PDF</button>
-      </div>
-    </body>
-    </html>
-  `);
-
-  receiptWindow.document.close();
 }
 
 function renderIncomesPage(data) {
@@ -1017,6 +563,20 @@ function renderIncomesPage(data) {
   setText("incomeTotalCount", String(data.incomes.length));
   setText("incomeTotalAmount", formatCurrency(sumBy(data.incomes, "amount")));
   setText("incomeLastStudent", data.incomes[0]?.student || "Sin datos");
+}
+
+function bindDeleteIncomeButtons(data) {
+  document.querySelectorAll("[data-delete-income]").forEach((button) => {
+    button.onclick = () => {
+      const id = button.getAttribute("data-delete-income");
+      if (!confirmDelete()) return;
+
+      data.incomes = data.incomes.filter((item) => item.id !== id);
+      saveData(data);
+      toast("Ingreso eliminado correctamente.");
+      setTimeout(() => window.location.reload(), 300);
+    };
+  });
 }
 
 function renderPaymentHistoryPage(data) {
@@ -1374,6 +934,11 @@ function generateReceiptPDF(data, incomeId) {
             <span>Monto recibido</span>
             <strong>${amountOriginal}</strong>
             <small>Equivalente en USD: ${amountUsd}</small>
+          </div>
+
+          <div class="footer-note">
+            Gracias por confiar en Expressive English Academy.
+            Este recibo fue generado desde la plataforma privada de administración financiera.
           </div>
         </div>
       </div>
@@ -1908,8 +1473,39 @@ function generateTeacherReceiptPDF(data, paymentId) {
           margin: 0;
           opacity: 0.9;
         }
+        .receipt-tag {
+          text-align: right;
+        }
+        .receipt-tag span {
+          display: block;
+          font-size: 0.82rem;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          opacity: 0.85;
+        }
+        .receipt-tag strong {
+          display: block;
+          margin-top: 10px;
+          font-size: 1.2rem;
+        }
         .receipt-body {
           padding: 34px;
+        }
+        .intro-box {
+          background: linear-gradient(135deg, #f4f8fc, #ffffff);
+          border: 1px solid rgba(16, 35, 59, 0.08);
+          border-radius: 20px;
+          padding: 22px;
+          margin-bottom: 24px;
+        }
+        .intro-box h2 {
+          margin: 0 0 8px;
+          color: #0f2b4b;
+        }
+        .intro-box p {
+          margin: 0;
+          color: #50657f;
+          line-height: 1.6;
         }
         .detail-grid {
           display: grid;
@@ -1960,6 +1556,13 @@ function generateTeacherReceiptPDF(data, paymentId) {
           opacity: 0.86;
           display: block;
         }
+        .footer-note {
+          margin-top: 26px;
+          padding-top: 20px;
+          border-top: 1px dashed rgba(16, 35, 59, 0.18);
+          color: #5c6f85;
+          line-height: 1.7;
+        }
         .print-actions {
           max-width: 880px;
           margin: 18px auto 0;
@@ -2008,9 +1611,22 @@ function generateTeacherReceiptPDF(data, paymentId) {
               <p>Comprobante de pago a maestro</p>
             </div>
           </div>
+
+          <div class="receipt-tag">
+            <span>Colilla</span>
+            <strong>${receiptNumber}</strong>
+          </div>
         </div>
 
         <div class="receipt-body">
+          <div class="intro-box">
+            <h2>Comprobante de pago emitido</h2>
+            <p>
+              Este documento sirve como constancia del pago realizado al personal docente de
+              Expressive English Academy.
+            </p>
+          </div>
+
           <div class="detail-grid">
             <div class="detail-card">
               <span>Fecha de pago</span>
@@ -2047,6 +1663,11 @@ function generateTeacherReceiptPDF(data, paymentId) {
             <span>Monto pagado</span>
             <strong>${amountOriginal}</strong>
             <small>Equivalente en USD: ${amountUsd}</small>
+          </div>
+
+          <div class="footer-note">
+            Firmado digitalmente como comprobante interno de pago.
+            Este documento puede enviarse al maestro como colilla de pago o constancia.
           </div>
         </div>
       </div>
@@ -2154,6 +1775,288 @@ function buildTeacherPaymentDescription(teacher, subcategory) {
   return `Pago al profesor ${cleanTeacher} por ${cleanSubcategory}`;
 }
 
+function renderInvestmentsPage(data) {
+  fillSelect("investmentCategorySelect", data.investmentCategories);
+  fillSelect("investmentAccountSelect", data.accounts.map((a) => a.name));
+  renderTagList("investmentCategoriesList", data.investmentCategories);
+
+  const form = document.getElementById("investmentForm");
+  if (!form) return;
+
+  form.date.value = todayValue();
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    const payload = {
+      id: cryptoRandom(),
+      date: form.elements["date"].value,
+      createdAt: new Date().toISOString(),
+      concept: form.elements["concept"].value.trim(),
+      category: form.elements["category"].value,
+      amount: Number(form.elements["amount"].value),
+      account: form.elements["account"].value,
+      notes: form.elements["notes"].value.trim()
+    };
+
+    if (!payload.date || !payload.concept || payload.amount <= 0) {
+      toast("Completa correctamente todos los campos de la inversión.");
+      return;
+    }
+
+    data.investments.unshift(payload);
+    saveData(data);
+    toast("Inversión guardada correctamente.");
+    setTimeout(() => window.location.reload(), 300);
+  });
+
+  const categoryForm = document.getElementById("investmentCategoryForm");
+  if (categoryForm) {
+    categoryForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const name = categoryForm.elements["categoryName"].value.trim().toLowerCase();
+      if (!name) return;
+
+      if (!data.investmentCategories.includes(name)) {
+        data.investmentCategories.push(name);
+        saveData(data);
+        toast("Categoría agregada.");
+        setTimeout(() => window.location.reload(), 300);
+      } else {
+        toast("Esa categoría ya existe.");
+      }
+    });
+  }
+
+  const table = document.getElementById("investmentTableBody");
+  if (table) {
+    table.innerHTML = data.investments.length
+      ? data.investments.map((item) => `
+        <tr>
+          <td>${formatDate(item.date)}</td>
+          <td>${escapeHtml(item.concept)}</td>
+          <td>${escapeHtml(item.category)}</td>
+          <td class="amount-negative">${formatCurrency(item.amount)}</td>
+          <td>${escapeHtml(item.account)}</td>
+          <td>${escapeHtml(item.notes || "-")}</td>
+        </tr>
+      `).join("")
+      : `<tr><td colspan="6">No hay inversiones registradas.</td></tr>`;
+  }
+
+  setText("investmentTotalAmount", formatCurrency(sumBy(data.investments, "amount")));
+  setText("investmentTotalCount", String(data.investments.length));
+  setText("investmentLastItem", data.investments[0]?.concept || "Sin datos");
+}
+
+function renderReportsPage(data) {
+  const metrics = computeMetrics(data);
+  const monthly = computeMonthlyBreakdown(data);
+  const studentStats = computeStudentStats(data);
+
+  setText("reportIncome", formatCurrency(monthly.income));
+  setText("reportExpenses", formatCurrency(monthly.totalExpenses));
+  setText("reportBalance", formatCurrency(monthly.balance));
+  setText("reportCaja", formatCurrency(metrics.cajaTotal));
+  setText("reportOperationalExpenses", formatCurrency(monthly.operational));
+  setText("reportTeacherExpenses", formatCurrency(monthly.teachers));
+  setText("reportInvestmentExpenses", formatCurrency(monthly.investments));
+  setText("reportNetFlow", formatCurrency(monthly.balance));
+
+  const comparison = document.getElementById("comparisonBars");
+  if (comparison) {
+    const maxValue = Math.max(monthly.income, monthly.operational, monthly.teachers, monthly.investments, monthly.totalExpenses, 1);
+
+    comparison.innerHTML = `
+      <div class="comparison-bar-card">
+        <strong>Ingresos</strong>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${(monthly.income / maxValue) * 100}%"></div>
+        </div>
+        <small class="subtle">${formatCurrency(monthly.income)}</small>
+      </div>
+
+      <div class="comparison-bar-card">
+        <strong>Gastos operativos</strong>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${(monthly.operational / maxValue) * 100}%"></div>
+        </div>
+        <small class="subtle">${formatCurrency(monthly.operational)}</small>
+      </div>
+
+      <div class="comparison-bar-card">
+        <strong>Pagos a maestros</strong>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${(monthly.teachers / maxValue) * 100}%"></div>
+        </div>
+        <small class="subtle">${formatCurrency(monthly.teachers)}</small>
+      </div>
+
+      <div class="comparison-bar-card">
+        <strong>Inversiones</strong>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${(monthly.investments / maxValue) * 100}%"></div>
+        </div>
+        <small class="subtle">${formatCurrency(monthly.investments)}</small>
+      </div>
+    `;
+  }
+
+  renderExpensePieChart(monthly);
+
+  const categories = buildCategoryReportFromMonth(data);
+  const categoryBars = document.getElementById("categoryBars");
+  const maxCategory = Math.max(...categories.map((item) => item.amount), 1);
+
+  if (categoryBars) {
+    categoryBars.innerHTML = categories.length
+      ? categories.map((item) => `
+        <div class="bar-row">
+          <div class="bar-row-head">
+            <strong>${escapeHtml(item.label)}</strong>
+            <span>${formatCurrency(item.amount)}</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${(item.amount / maxCategory) * 100}%"></div>
+          </div>
+        </div>
+      `).join("")
+      : emptyMessage("No hay egresos este mes.");
+  }
+
+  const summaryTable = document.getElementById("reportSummaryTable");
+  if (summaryTable) {
+    summaryTable.innerHTML = `
+      <tr><td>Ingresos del mes</td><td>${formatCurrency(monthly.income)}</td></tr>
+      <tr><td>Gastos operativos del mes</td><td>${formatCurrency(monthly.operational)}</td></tr>
+      <tr><td>Pagos a maestros del mes</td><td>${formatCurrency(monthly.teachers)}</td></tr>
+      <tr><td>Inversiones del mes</td><td>${formatCurrency(monthly.investments)}</td></tr>
+      <tr><td>Total de gastos del mes</td><td>${formatCurrency(monthly.totalExpenses)}</td></tr>
+      <tr><td>Balance del mes</td><td>${formatCurrency(monthly.balance)}</td></tr>
+      <tr><td>Total en caja</td><td>${formatCurrency(metrics.cajaTotal)}</td></tr>
+      <tr><td>Estudiantes activos</td><td>${studentStats.active}</td></tr>
+      <tr><td>Al día</td><td>${studentStats.onTime}</td></tr>
+      <tr><td>Pendientes</td><td>${studentStats.pending}</td></tr>
+      <tr><td>Retrasados</td><td>${studentStats.late}</td></tr>
+    `;
+  }
+
+  const downloadButton = document.getElementById("downloadMonthlyReportBtn");
+  if (downloadButton) {
+    downloadButton.addEventListener("click", () => downloadCurrentMonthReport(data, studentStats));
+  }
+}
+
+function renderExpensePieChart(monthly) {
+  const pie = document.getElementById("expensePieChart");
+  const legend = document.getElementById("expensePieLegend");
+  if (!pie || !legend) return;
+
+  const values = [
+    { label: "Gastos operativos", value: monthly.operational, color: "#ff8a65" },
+    { label: "Pagos a maestros", value: monthly.teachers, color: "#4fc3f7" },
+    { label: "Inversiones", value: monthly.investments, color: "#81c784" }
+  ];
+
+  const total = values.reduce((sum, item) => sum + item.value, 0);
+
+  if (total <= 0) {
+    pie.style.background = "rgba(255,255,255,0.05)";
+    legend.innerHTML = emptyMessage("No hay egresos para mostrar este mes.");
+    return;
+  }
+
+  let currentAngle = 0;
+  const segments = values.map((item) => {
+    const start = currentAngle;
+    const percentage = (item.value / total) * 100;
+    currentAngle += percentage;
+    return `${item.color} ${start}% ${currentAngle}%`;
+  });
+
+  pie.style.background = `conic-gradient(${segments.join(", ")})`;
+  pie.style.boxShadow = "inset 0 0 0 18px rgba(7, 17, 31, 0.88), 0 18px 34px rgba(0,0,0,0.25)";
+
+  legend.innerHTML = values.map((item) => `
+    <div class="mini-stat-card">
+      <span style="display:flex; align-items:center; gap:10px;">
+        <span style="width:12px; height:12px; border-radius:50%; background:${item.color}; display:inline-block;"></span>
+        ${escapeHtml(item.label)}
+      </span>
+      <strong>${formatCurrency(item.value)}</strong>
+      <small>${total > 0 ? ((item.value / total) * 100).toFixed(1) : 0}% del total de egresos</small>
+    </div>
+  `).join("");
+}
+
+function computeMonthlyBreakdown(data) {
+  const month = currentMonth();
+  const year = currentYear();
+
+  const income = data.incomes
+    .filter((item) => isSameMonth(item.date, month, year))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const operational = data.expenses
+    .filter((item) => isSameMonth(item.date, month, year))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const teachers = data.teacherPayments
+    .filter((item) => isSameMonth(item.date, month, year))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const investments = data.investments
+    .filter((item) => isSameMonth(item.date, month, year))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const totalExpenses = operational + teachers + investments;
+  const balance = income - totalExpenses;
+
+  return {
+    income,
+    operational,
+    teachers,
+    investments,
+    totalExpenses,
+    balance
+  };
+}
+
+function computeMetrics(data) {
+  const totalIncome = sumBy(data.incomes, "amount");
+  const totalExpenses =
+    sumBy(data.expenses, "amount") +
+    sumBy(data.teacherPayments, "amount") +
+    sumBy(data.investments, "amount");
+
+  const totalBalance = totalIncome - totalExpenses;
+  const month = currentMonth();
+  const year = currentYear();
+
+  const incomesMonth = data.incomes
+    .filter((item) => isSameMonth(item.date, month, year))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const expensesMonth =
+    data.expenses.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0) +
+    data.teacherPayments.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0) +
+    data.investments.filter((item) => isSameMonth(item.date, month, year)).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const balanceMonth = incomesMonth - expensesMonth;
+  const cajaTotal = getAccountBalances(data).reduce((sum, item) => sum + item.current, 0);
+
+  return {
+    totalIncome,
+    totalExpenses,
+    totalBalance,
+    incomesMonth,
+    expensesMonth,
+    balanceMonth,
+    cajaTotal
+  };
+}
+
 function computeStudentStats(data) {
   const activeStudents = data.students.filter((student) => student.status === "Activo");
 
@@ -2222,6 +2125,16 @@ function getAccountBalances(data) {
   });
 }
 
+function syncIncomeToStudent(data, income) {
+  const foundStudent = data.students.find(
+    (student) => student.name.toLowerCase() === income.student.toLowerCase()
+  );
+  if (!foundStudent) return;
+  if (!foundStudent.level && income.level) {
+    foundStudent.level = income.level;
+  }
+}
+
 function buildRecentMovementsWithRunningBalance(data) {
   const initialBalance = data.accounts.reduce(
     (sum, account) => sum + Number(account.initialBalance || 0),
@@ -2282,16 +2195,6 @@ function buildRecentMovementsWithRunningBalance(data) {
   });
 
   return withBalance.reverse();
-}
-
-function syncIncomeToStudent(data, income) {
-  const foundStudent = data.students.find(
-    (student) => student.name.toLowerCase() === income.student.toLowerCase()
-  );
-  if (!foundStudent) return;
-  if (!foundStudent.level && income.level) {
-    foundStudent.level = income.level;
-  }
 }
 
 function buildCategoryReportFromMonth(data) {
@@ -2385,7 +2288,6 @@ function downloadCurrentMonthReport(data, studentStats) {
   const expenses = data.expenses.filter((item) => isSameMonth(item.date, month, year));
   const teachers = data.teacherPayments.filter((item) => isSameMonth(item.date, month, year));
   const investments = data.investments.filter((item) => isSameMonth(item.date, month, year));
-  const enrollments = data.students.filter((item) => isSameMonth(item.enrollmentDate || item.paymentDate || "", month, year));
 
   const rows = [
     ["Reporte mensual", monthLabel],
@@ -2397,20 +2299,6 @@ function downloadCurrentMonthReport(data, studentStats) {
     ["Al día", studentStats.onTime],
     ["Pendientes", studentStats.pending],
     ["Retrasados", studentStats.late],
-    [],
-    ["Matriculas"],
-    ["Fecha matrícula", "Fecha pago", "Estudiante", "Nivel", "Docente", "Tipo", "Mensualidad USD", "Material C$", "Due date"],
-    ...enrollments.map((item) => [
-      item.enrollmentDate || "",
-      item.paymentDate || "",
-      item.name || "",
-      item.level || "",
-      item.assignedTeacher || "",
-      item.studentType === "nino" ? "Niño" : "Adulto",
-      item.monthlyFee || 0,
-      item.materialFee || 0,
-      item.dueDay || ""
-    ]),
     [],
     ["Ingresos"],
     ["Fecha", "Estudiante", "Nivel", "Concepto", "Categoría", "Método", "Moneda", "Monto original", "Tasa", "Monto USD", "Cuenta"],
@@ -2565,9 +2453,8 @@ function sanitizeFileName(text) {
 }
 
 function isSameMonth(dateString, month, year) {
-  if (!dateString) return false;
   const date = new Date(`${dateString}T00:00:00`);
-  return !Number.isNaN(date.getTime()) && date.getMonth() === month && date.getFullYear() === year;
+  return date.getMonth() === month && date.getFullYear() === year;
 }
 
 function capitalize(text) {
