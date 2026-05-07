@@ -2,6 +2,10 @@ const STORAGE_KEY = "eea_finances_app_v4";
 const SESSION_KEY = "eea_finances_session";
 const DELETE_CODE = "8681";
 
+const SUPABASE_URL = "https://iwxbxiwqpyyissjzyzcu.supabase.co";
+const SUPABASE_KEY = "sb_publishable_7sW_vVH2fBS_UPhlsNCANQ_bNhwMfCM";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 document.addEventListener("DOMContentLoaded", () => {
   seedStorage();
 
