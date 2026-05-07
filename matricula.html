@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Matrícula | Expressive English Academy Finances</title>
+  <title>MatrÃ­cula | Expressive English Academy Finances</title>
   <link rel="stylesheet" href="styles.css" />
   <style>
     .hidden-field {
@@ -26,7 +26,7 @@
       <nav class="sidebar-nav">
         <a href="index.html" class="nav-link">Inicio / Dashboard</a>
         <a href="estudiantes.html" class="nav-link">Estudiantes</a>
-        <a href="matricula.html" class="nav-link active">Matrícula</a>
+        <a href="matricula.html" class="nav-link active">MatrÃ­cula</a>
         <a href="ingresos.html" class="nav-link">Ingresos</a>
         <a href="historial-pagos.html" class="nav-link">Historial de pagos</a>
         <a href="gastos.html" class="nav-link">Gastos</a>
@@ -37,23 +37,23 @@
       </nav>
 
       <div class="sidebar-footer glass-card">
-        <span class="eyebrow">Matrícula</span>
-        <p>Registra nuevos estudiantes, asigna docente y genera su comprobante de inscripción.</p>
+        <span class="eyebrow">MatrÃ­cula</span>
+        <p>Registra nuevos estudiantes, asigna docente y genera su comprobante de inscripciÃ³n.</p>
       </div>
     </aside>
 
     <div class="main-layout">
       <header class="topbar">
         <div>
-          <span class="eyebrow">Gestión académica</span>
-          <h1>Matrícula</h1>
+          <span class="eyebrow">GestiÃ³n acadÃ©mica</span>
+          <h1>MatrÃ­cula</h1>
         </div>
 
         <div class="topbar-actions">
           <button class="btn btn-secondary" id="downloadReceipt" type="button">
             Descargar comprobante
           </button>
-          <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
+          <button class="btn btn-secondary" data-logout>Cerrar sesiÃ³n</button>
         </div>
       </header>
 
@@ -63,7 +63,7 @@
             <div class="panel-header">
               <div>
                 <span class="eyebrow">Nuevo ingreso</span>
-                <h2>Registrar matrícula</h2>
+                <h2>Registrar matrÃ­cula</h2>
               </div>
             </div>
 
@@ -82,7 +82,7 @@
                 <span>Tipo de estudiante</span>
                 <select name="studentType" id="studentTypeSelect" required>
                   <option value="adulto">Adulto</option>
-                  <option value="nino">Niño</option>
+                  <option value="nino">NiÃ±o</option>
                 </select>
               </label>
 
@@ -109,23 +109,23 @@
               </label>
 
               <label class="field">
-                <span>Due date / día de vencimiento</span>
+                <span>Due date / dÃ­a de vencimiento</span>
                 <input type="number" min="1" max="31" name="dueDay" required />
               </label>
 
               <label class="field hidden-field" id="motherNameField">
-                <span>Nombre de la mamá</span>
+                <span>Nombre de la mamÃ¡</span>
                 <input type="text" name="motherName" />
               </label>
 
               <label class="field hidden-field" id="guardianPhoneField">
-                <span>Número telefónico</span>
+                <span>NÃºmero telefÃ³nico</span>
                 <input type="text" name="guardianPhone" />
               </label>
 
               <label class="field field-full">
                 <span>Notas</span>
-                <textarea name="notes" placeholder="Observaciones de matrícula"></textarea>
+                <textarea name="notes" placeholder="Observaciones de matrÃ­cula"></textarea>
               </label>
 
               <button type="submit" class="btn btn-primary">
@@ -138,12 +138,12 @@
             <div class="panel-header">
               <div>
                 <span class="eyebrow">Vista previa</span>
-                <h2>Comprobante de matrícula</h2>
+                <h2>Comprobante de matrÃ­cula</h2>
               </div>
             </div>
 
             <div id="receiptPreview" class="receipt-preview">
-              <p>Aquí aparecerá el comprobante generado...</p>
+              <p>AquÃ­ aparecerÃ¡ el comprobante generado...</p>
             </div>
           </article>
         </section>
@@ -151,6 +151,7 @@
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>`r`n  <script src="script.js"></script>
 </body>
 </html>
+
