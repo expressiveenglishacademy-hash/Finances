@@ -885,11 +885,11 @@ function renderStudentsPage(data) {
         <div class="mini-stat-card">
           <span>${escapeHtml(student.name)}</span>
           <strong>${student.statusPayment}</strong>
-          <small>Último pago: ${student.lastPayment ? formatDate(student.lastPayment) : "Sin pago"}</small>
-          <small>Due date actual: día ${student.dueDay}</small>
+          <small>\u00DAltimo pago: ${student.lastPayment ? formatDate(student.lastPayment) : "Sin pago"}</small>
+          <small>Due date actual: d\u00EDa ${student.dueDay}</small>
         </div>
       `).join("")
-      : emptyMessage("Aún no hay estudiantes registrados.");
+      : emptyMessage("A\u00FAn no hay estudiantes registrados.");
   }
 
   const tableBody = document.getElementById("studentsTableBody");
@@ -935,7 +935,7 @@ function bindStudentDueDateButtons(data) {
       if (!student) return;
 
       const newDueDay = window.prompt(
-        `Ingresa el nuevo due date para ${student.name} (día del 1 al 31):`,
+        `Ingresa el nuevo due date para ${student.name} (d\u00EDa del 1 al 31):`,
         String(student.dueDay || "")
       );
 
@@ -944,7 +944,7 @@ function bindStudentDueDateButtons(data) {
       const parsedDay = Number(newDueDay);
 
       if (!Number.isInteger(parsedDay) || parsedDay < 1 || parsedDay > 31) {
-        toast("Debes ingresar un día válido entre 1 y 31.");
+        toast("Debes ingresar un d\u00EDa v\u00E1lido entre 1 y 31.");
         return;
       }
 
@@ -977,7 +977,7 @@ function bindEditStudentButtons(data) {
 
       const cleanName = newName.trim();
       if (!cleanName) {
-        toast("El nombre no puede quedar vacío.");
+        toast("El nombre no puede quedar vac\u00EDo.");
         return;
       }
 
@@ -1009,7 +1009,7 @@ function bindEditStudentButtons(data) {
 
       const parsedDueDay = Number(newDueDay);
       if (!Number.isInteger(parsedDueDay) || parsedDueDay < 1 || parsedDueDay > 31) {
-        toast("El due date debe ser un número entre 1 y 31.");
+        toast("El due date debe ser un n\u00FAmero entre 1 y 31.");
         return;
       }
 
@@ -1067,7 +1067,7 @@ function bindDeleteStudentButtons(data) {
       if (!student) return;
 
       const confirmed = window.confirm(
-        `Se eliminará el estudiante ${student.name}. ¿Deseas continuar?`
+        `Se eliminar\u00E1 el estudiante ${student.name}. \u00BFDeseas continuar?`
       );
       if (!confirmed) return;
       if (!confirmDelete()) return;
@@ -1158,7 +1158,7 @@ function renderEnrollmentPage(data) {
     }
 
     if (studentType === "nino" && (!motherName || !guardianPhone)) {
-      toast("Para estudiantes niños debes agregar nombre de la mamá y teléfono.");
+      toast("Para estudiantes ni\u00F1os debes agregar nombre de la mam\u00E1 y tel\u00E9fono.");
       return;
     }
 
@@ -1197,7 +1197,7 @@ function renderEnrollmentPage(data) {
       await upsertStudentToSupabase(studentPayload);
     } catch (error) {
       console.error(error);
-      toast("No se pudo guardar la matrícula en la nube.");
+      toast("No se pudo guardar la matr\u00EDcula en la nube.");
       return;
     }
 
@@ -1220,7 +1220,7 @@ function renderEnrollmentPage(data) {
       receiptPreview.innerHTML = buildEnrollmentReceiptPreview(latestEnrollmentReceipt);
     }
 
-    toast("Matrícula guardada correctamente. El estudiante ya aparece en la sección Estudiantes.");
+    toast("Matr\u00EDcula guardada correctamente. El estudiante ya aparece en la secci\u00F3n Estudiantes.");
 
     form.reset();
     if (form.elements["paymentDate"]) {
@@ -1233,7 +1233,7 @@ function renderEnrollmentPage(data) {
   if (downloadButton) {
     downloadButton.addEventListener("click", () => {
       if (!latestEnrollmentReceipt) {
-        toast("Primero genera una matrícula para descargar el comprobante.");
+        toast("Primero genera una matr\u00EDcula para descargar el comprobante.");
         return;
       }
 
