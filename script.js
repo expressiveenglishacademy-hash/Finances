@@ -6,6 +6,12 @@ const SUPABASE_URL = "https://iwxbxiwqpyyissjzyzcu.supabase.co";
 const SUPABASE_KEY = "sb_publishable_7sW_vVH2fBS_UPhlsNCANQ_bNhwMfCM";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+async function getAuthenticatedSession() {
+  const { data, error } = await supabaseClient.auth.getSession();
+  if (error) throw error;
+  return data.session;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   seedStorage();
 
@@ -14,13 +20,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindLogout();
   bindResetButtons();
 
-  if (page !== "login" && !localStorage.getItem(SESSION_KEY)) {
-    window.location.href = "login.html";
+  const session = await getAuthenticatedSession();
+
+  if (page === "login") {
+    if (session) {
+      window.location.href = "index.html";
+      return;
+    }
+
+    initLogin();
     return;
   }
 
-  if (page === "login") {
-    initLogin();
+  if (!session) {
+    localStorage.removeItem(SESSION_KEY);
+    window.location.href = "login.html";
     return;
   }
 
@@ -702,14 +716,25 @@ function initLogin() {
   const form = document.getElementById("loginForm");
   if (!form) return;
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const email = form.email.value.trim();
     const password = form.password.value.trim();
 
     if (!email || !password) {
-      toast("Completa correo y contraseña.");
+      toast("Completa correo y contrase?a.");
+      return;
+    }
+
+    const { error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      console.error(error);
+      toast("Correo o contrase?a incorrectos.");
       return;
     }
 
@@ -724,7 +749,8 @@ function initLogin() {
 
 function bindLogout() {
   document.querySelectorAll("[data-logout]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
+      await supabaseClient.auth.signOut();
       localStorage.removeItem(SESSION_KEY);
       window.location.href = "login.html";
     });
