@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  const data = getData();
+ const data = await getData();
   updateSidebarCaja(data);
 
   const handlers = {
