@@ -416,11 +416,43 @@ function renderStudentsPage(data) {
         return;
       }
 
-      data.students.unshift(payload);
-      saveData(data);
-      toast("Estudiante guardado correctamente.");
-      setTimeout(() => window.location.reload(), 300);
+     data.students.unshift(payload);
+saveData(data);
+
+try {
+  const { error } = await supabaseClient
+    .from("students")
+    .upsert({
+      id: payload.id,
+      name: payload.name || "",
+      level: payload.level || "",
+      monthly_fee: Number(payload.monthlyFee || 0),
+      due_day: Number(payload.dueDay || 1),
+      status: payload.status || "Activo",
+      contact: payload.contact || "",
+      notes: payload.notes || "",
+      student_type: payload.studentType || "adulto",
+      mother_name: payload.motherName || "",
+      guardian_phone: payload.guardianPhone || "",
+      assigned_teacher: payload.assignedTeacher || "",
+      payment_date: payload.paymentDate || null,
+      material_fee: Number(payload.materialFee || 0),
+      material_currency: payload.materialCurrency || "NIO",
+      enrollment_date: payload.enrollmentDate || null
+    }, {
+      onConflict: "id"
     });
+
+  if (error) throw error;
+} catch (error) {
+  console.error("Error saving student to Supabase:", error);
+  toast("No se pudo guardar en Supabase. Revisa la consola.");
+  return;
+}
+
+toast("Estudiante guardado correctamente.");
+setTimeout(() => window.location.reload(), 300);
+
   }
 
   const stats = computeStudentStats(data);
