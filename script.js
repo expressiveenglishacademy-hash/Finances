@@ -6,8 +6,7 @@ const SUPABASE_URL = "https://iwxbxiwqpyyissjzyzcu.supabase.co";
 const SUPABASE_KEY = "sb_publishable_7sW_vVH2fBS_UPhlsNCANQ_bNhwMfCM";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-document.addEventListener("DOMContentLoaded", () => {
-  seedStorage();
+document.addEventListener("DOMContentLoaded", async () => {
 
   const page = document.body.dataset.page || "";
 
@@ -218,8 +217,42 @@ function buildLegacyTimestamp(dateString, type, index) {
   return `${dateString}T${hh}:${mm}:00`;
 }
 
-function getData() {
-  return JSON.parse(localStorage.getItem(STORAGE_KEY)) || createEmptyData();
+async function getData() {
+  const localData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || createEmptyData();
+
+  try {
+    const { data: students, error } = await supabaseClient
+      .from("students")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    localData.students = (students || []).map((row) => ({
+      id: row.id || cryptoRandom(),
+      name: row.name || "",
+      level: row.level || "",
+      monthlyFee: Number(row.monthly_fee || 0),
+      dueDay: Number(row.due_day || 1),
+      status: row.status || "Activo",
+      contact: row.contact || "",
+      notes: row.notes || "",
+      studentType: row.student_type || "adulto",
+      motherName: row.mother_name || "",
+      guardianPhone: row.guardian_phone || "",
+      assignedTeacher: row.assigned_teacher || "",
+      paymentDate: row.payment_date || "",
+      materialFee: Number(row.material_fee || 0),
+      materialCurrency: row.material_currency || "NIO",
+      enrollmentDate: row.enrollment_date || ""
+    }));
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(localData));
+  } catch (error) {
+    console.error("Error loading students from Supabase:", error);
+  }
+
+  return localData;
 }
 
 function saveData(data) {
