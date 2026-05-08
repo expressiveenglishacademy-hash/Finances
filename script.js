@@ -63,28 +63,28 @@ const DEFAULT_ACCOUNTS = [
     name: "Efectivo USD",
     type: "Efectivo",
     initialBalance: 0,
-    notes: "Caja en d?lares"
+    notes: "Caja en d\u00F3lares"
   },
   {
     id: "account_cash_nio",
     name: "Efectivo C$",
     type: "Efectivo",
     initialBalance: 0,
-    notes: "Caja en c?rdobas"
+    notes: "Caja en c\u00F3rdobas"
   },
   {
     id: "account_bank_usd",
     name: "Banco USD",
     type: "Banco",
     initialBalance: 0,
-    notes: "Cuenta bancaria en d?lares"
+    notes: "Cuenta bancaria en d\u00F3lares"
   },
   {
     id: "account_bank_nio",
     name: "Banco C$",
     type: "Banco",
     initialBalance: 0,
-    notes: "Cuenta bancaria en c?rdobas"
+    notes: "Cuenta bancaria en c\u00F3rdobas"
   }
 ];
 
@@ -93,7 +93,7 @@ function createEmptyData() {
     incomeCategories: ["Mensualidad"],
     expenseCategories: [
       "publicidad",
-      "material did?ctico",
+      "material did\u00E1ctico",
       "marcadores",
       "impresiones",
       "transporte",
@@ -101,7 +101,7 @@ function createEmptyData() {
     ],
     investmentCategories: [
       "publicidad",
-      "material did?ctico",
+      "material did\u00E1ctico",
       "equipo",
       "mejoras",
       "otros"
@@ -729,7 +729,7 @@ function initLogin() {
     const password = form.password.value.trim();
 
     if (!email || !password) {
-      toast("Completa correo y contrase?a.");
+      toast("Completa correo y contrase\u00F1a.");
       return;
     }
 
@@ -740,7 +740,7 @@ function initLogin() {
 
     if (error) {
       console.error(error);
-      toast("Correo o contrase?a incorrectos.");
+      toast("Correo o contrase\u00F1a incorrectos.");
       return;
     }
 
@@ -766,7 +766,7 @@ function bindLogout() {
 function bindResetButtons() {
   document.querySelectorAll("[data-reset-demo]").forEach((button) => {
     button.addEventListener("click", async () => {
-      const confirmed = window.confirm("Se borrar?n todos los datos guardados. ?Deseas continuar?");
+      const confirmed = window.confirm("Se borrar\u00E1n todos los datos guardados. \u00BFDeseas continuar?");
       if (!confirmed) return;
 
       const emptyData = createEmptyData();
