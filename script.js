@@ -57,12 +57,43 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (handlers[page]) handlers[page]();
 });
 
+const DEFAULT_ACCOUNTS = [
+  {
+    id: "account_cash_usd",
+    name: "Efectivo USD",
+    type: "Efectivo",
+    initialBalance: 0,
+    notes: "Caja en d?lares"
+  },
+  {
+    id: "account_cash_nio",
+    name: "Efectivo C$",
+    type: "Efectivo",
+    initialBalance: 0,
+    notes: "Caja en c?rdobas"
+  },
+  {
+    id: "account_bank_usd",
+    name: "Banco USD",
+    type: "Banco",
+    initialBalance: 0,
+    notes: "Cuenta bancaria en d?lares"
+  },
+  {
+    id: "account_bank_nio",
+    name: "Banco C$",
+    type: "Banco",
+    initialBalance: 0,
+    notes: "Cuenta bancaria en c?rdobas"
+  }
+];
+
 function createEmptyData() {
   return {
     incomeCategories: ["Mensualidad"],
     expenseCategories: [
       "publicidad",
-      "material didáctico",
+      "material did?ctico",
       "marcadores",
       "impresiones",
       "transporte",
@@ -70,41 +101,12 @@ function createEmptyData() {
     ],
     investmentCategories: [
       "publicidad",
-      "material didáctico",
+      "material did?ctico",
       "equipo",
       "mejoras",
       "otros"
     ],
-    accounts: [
-      {
-        id: cryptoRandom(),
-        name: "Efectivo USD",
-        type: "Efectivo",
-        initialBalance: 0,
-        notes: "Caja en dólares"
-      },
-      {
-        id: cryptoRandom(),
-        name: "Efectivo C$",
-        type: "Efectivo",
-        initialBalance: 0,
-        notes: "Caja en córdobas"
-      },
-      {
-        id: cryptoRandom(),
-        name: "Banco USD",
-        type: "Banco",
-        initialBalance: 0,
-        notes: "Cuenta bancaria en dólares"
-      },
-      {
-        id: cryptoRandom(),
-        name: "Banco C$",
-        type: "Banco",
-        initialBalance: 0,
-        notes: "Cuenta bancaria en córdobas"
-      }
-    ],
+    accounts: DEFAULT_ACCOUNTS.map((account) => ({ ...account })),
     students: [],
     teachers: [],
     incomes: [],
@@ -308,7 +310,11 @@ function mergeDataSets(remoteData, localData) {
     incomeCategories: mergeUniqueStrings(remoteData.incomeCategories, localData.incomeCategories),
     expenseCategories: mergeUniqueStrings(remoteData.expenseCategories, localData.expenseCategories),
     investmentCategories: mergeUniqueStrings(remoteData.investmentCategories, localData.investmentCategories),
-    accounts: mergeRecordsByKey(remoteData.accounts, localData.accounts, (item) => item.id || item.name),
+    accounts: mergeRecordsByKey(
+      remoteData.accounts,
+      localData.accounts,
+      (item) => (item.name || "").trim().toLowerCase() || item.id
+    ),
     students: mergeRecordsByKey(remoteData.students, localData.students, (item) => item.id || item.name),
     teachers: mergeRecordsByKey(remoteData.teachers, localData.teachers, (item) => item.id || item.name),
     incomes: mergeRecordsByKey(remoteData.incomes, localData.incomes, (item) => item.id),
@@ -759,11 +765,27 @@ function bindLogout() {
 
 function bindResetButtons() {
   document.querySelectorAll("[data-reset-demo]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const confirmed = window.confirm("Se borrarán todos los datos guardados. ¿Deseas continuar?");
+    button.addEventListener("click", async () => {
+      const confirmed = window.confirm("Se borrar?n todos los datos guardados. ?Deseas continuar?");
       if (!confirmed) return;
 
-      saveData(createEmptyData());
+      const emptyData = createEmptyData();
+
+      if (remoteSyncTimer) {
+        window.clearTimeout(remoteSyncTimer);
+        remoteSyncTimer = null;
+      }
+
+      saveData(emptyData, { skipRemote: true });
+
+      try {
+        await syncFullDataToSupabase(emptyData);
+      } catch (error) {
+        console.error("Reset sync failed:", error);
+        toast("No se pudo reiniciar la nube. Intenta de nuevo.");
+        return;
+      }
+
       toast("Datos reiniciados correctamente.");
       setTimeout(() => window.location.reload(), 300);
     });
