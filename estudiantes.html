@@ -6,11 +6,14 @@
   <title>Estudiantes | Expressive English Academy Finances</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body data-page="estudiantes">
   <div class="app-shell">
+
     <aside class="sidebar">
       <a href="index.html" class="brand-block">
         <div class="brand-mark">EE</div>
+
         <div>
           <strong>Expressive English</strong>
           <span>Academy Finances</span>
@@ -37,7 +40,9 @@
       </div>
     </aside>
 
+
     <div class="main-layout">
+
       <header class="topbar">
         <div>
           <span class="eyebrow">Gestión académica</span>
@@ -45,12 +50,18 @@
         </div>
 
         <div class="topbar-actions">
-          <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
+          <button class="btn btn-secondary" data-logout>
+            Cerrar sesión
+          </button>
         </div>
       </header>
 
+
       <main class="content-grid">
+
+        <!-- ESTADÍSTICAS -->
         <section class="stats-grid">
+
           <article class="metric-card glass-card">
             <span class="eyebrow">Activos</span>
             <h3 id="studentsActiveCount">0</h3>
@@ -74,10 +85,15 @@
             <h3 id="studentsLateCount">0</h3>
             <p>Pagos vencidos.</p>
           </article>
+
         </section>
 
+
+        <!-- NUEVO ESTUDIANTE + RESUMEN -->
         <section class="two-column">
+
           <article class="glass-card">
+
             <div class="panel-header">
               <div>
                 <span class="eyebrow">Nuevo registro</span>
@@ -85,50 +101,86 @@
               </div>
             </div>
 
+
             <form id="studentForm" class="form-grid">
+
               <label class="field">
                 <span>Nombre</span>
-                <input type="text" name="name" required />
+                <input
+                  type="text"
+                  name="name"
+                  required
+                />
               </label>
+
 
               <label class="field">
                 <span>Nivel</span>
-                <input type="text" name="level" required />
+                <input
+                  type="text"
+                  name="level"
+                  required
+                />
               </label>
+
 
               <label class="field">
                 <span>Mensualidad (USD)</span>
-                <input type="number" step="0.01" min="0" name="monthlyFee" required />
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  name="monthlyFee"
+                  required
+                />
               </label>
+
 
               <label class="field">
                 <span>Due date</span>
-                <input type="number" min="1" max="31" name="dueDay" required />
+                <input
+                  type="number"
+                  min="1"
+                  max="31"
+                  name="dueDay"
+                  required
+                />
               </label>
 
-              <label class="field">
-                <span>Estado</span>
-                <select name="status" required>
-                  <option value="Activo">Activo</option>
-                  <option value="Inactivo">Inactivo</option>
-                </select>
-              </label>
 
               <label class="field">
                 <span>Contacto</span>
-                <input type="text" name="contact" />
+                <input
+                  type="text"
+                  name="contact"
+                />
               </label>
+
 
               <label class="field field-full">
                 <span>Notas</span>
-                <textarea name="notes" placeholder="Observaciones"></textarea>
+                <textarea
+                  name="notes"
+                  placeholder="Observaciones"
+                ></textarea>
               </label>
 
-              <button type="submit" class="btn btn-primary">Guardar estudiante</button>
+
+              <button
+                type="submit"
+                class="btn btn-primary"
+              >
+                Guardar estudiante
+              </button>
+
             </form>
+
           </article>
 
+
+          <!-- RESUMEN -->
           <article class="glass-card">
+
             <div class="panel-header">
               <div>
                 <span class="eyebrow">Resumen rápido</span>
@@ -136,20 +188,31 @@
               </div>
             </div>
 
-            <div id="studentsSummaryCards" class="stats-list"></div>
+            <div
+              id="studentsSummaryCards"
+              class="stats-list"
+            ></div>
+
           </article>
+
         </section>
 
+
+        <!-- ESTUDIANTES ACTIVOS -->
         <section class="glass-card">
+
           <div class="panel-header">
             <div>
-              <span class="eyebrow">Listado completo</span>
-              <h2>Tabla de estudiantes</h2>
+              <span class="eyebrow">Estudiantes actuales</span>
+              <h2>Estudiantes activos</h2>
             </div>
           </div>
 
+
           <div class="table-wrap">
+
             <table>
+
               <thead>
                 <tr>
                   <th>Nombre</th>
@@ -164,20 +227,87 @@
                   <th>Acciones</th>
                 </tr>
               </thead>
+
+
               <tbody id="studentsTableBody">
                 <tr>
-                  <td colspan="10">Cargando estudiantes...</td>
+                  <td colspan="10">
+                    Cargando estudiantes...
+                  </td>
                 </tr>
               </tbody>
+
             </table>
+
           </div>
+
         </section>
+
+
+        <!-- DROPPED OFF STUDENTS -->
+        <section
+          class="glass-card"
+          id="droppedOffStudentsSection"
+        >
+
+          <div class="panel-header">
+
+            <div>
+              <span class="eyebrow">Historial de estudiantes</span>
+              <h2>Dropped Off</h2>
+
+              <p>
+                Estudiantes que ya no están activos.
+                Su información e historial de pagos permanecen guardados.
+              </p>
+            </div>
+
+          </div>
+
+
+          <div class="table-wrap">
+
+            <table>
+
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Nivel</th>
+                  <th>Mensualidad</th>
+                  <th>Último pago</th>
+                  <th>Fecha Drop Off</th>
+                  <th>Contacto</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+
+
+              <tbody id="droppedOffTableBody">
+
+                <tr>
+                  <td colspan="8">
+                    Cargando estudiantes...
+                  </td>
+                </tr>
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </section>
+
       </main>
+
     </div>
+
   </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="script.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="script.js"></script>
 
 </body>
 </html>
