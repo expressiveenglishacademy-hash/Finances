@@ -901,7 +901,7 @@ function renderStudentsPage(data) {
         level: form.elements["level"].value.trim(),
         monthlyFee: Number(form.elements["monthlyFee"].value),
         dueDay: Number(form.elements["dueDay"].value),
-        status: normalizeStudentStatus(form.elements["status"].value),
+        status: "Activo",
         contact: form.elements["contact"].value.trim(),
         notes: form.elements["notes"].value.trim(),
         droppedOffDate: ""
@@ -3085,101 +3085,97 @@ function renderInvestmentsPage(data) {
 }
 
 function renderReportsPage(data) {
-  const metrics = computeMetrics(data);
-  const monthly = computeMonthlyBreakdown(data);
-  const studentStats = computeStudentStats(data);
-
-  setText("reportIncome", formatCurrency(monthly.income));
-  setText("reportExpenses", formatCurrency(monthly.totalExpenses));
-  setText("reportBalance", formatCurrency(monthly.balance));
-  setText("reportCaja", formatCurrency(metrics.cajaTotal));
-  setText("reportOperationalExpenses", formatCurrency(monthly.operational));
-  setText("reportTeacherExpenses", formatCurrency(monthly.teachers));
-  setText("reportInvestmentExpenses", formatCurrency(monthly.investments));
-  setText("reportNetFlow", formatCurrency(monthly.balance));
-
-  const comparison = document.getElementById("comparisonBars");
-  if (comparison) {
-    const maxValue = Math.max(monthly.income, monthly.operational, monthly.teachers, monthly.investments, monthly.totalExpenses, 1);
-
-    comparison.innerHTML = `
-      <div class="comparison-bar-card">
-        <strong>Ingresos</strong>
-        <div class="bar-track">
-          <div class="bar-fill" style="width:${(monthly.income / maxValue) * 100}%"></div>
-        </div>
-        <small class="subtle">${formatCurrency(monthly.income)}</small>
-      </div>
-
-      <div class="comparison-bar-card">
-        <strong>Gastos operativos</strong>
-        <div class="bar-track">
-          <div class="bar-fill" style="width:${(monthly.operational / maxValue) * 100}%"></div>
-        </div>
-        <small class="subtle">${formatCurrency(monthly.operational)}</small>
-      </div>
-
-      <div class="comparison-bar-card">
-        <strong>Pagos a maestros</strong>
-        <div class="bar-track">
-          <div class="bar-fill" style="width:${(monthly.teachers / maxValue) * 100}%"></div>
-        </div>
-        <small class="subtle">${formatCurrency(monthly.teachers)}</small>
-      </div>
-
-      <div class="comparison-bar-card">
-        <strong>Inversiones</strong>
-        <div class="bar-track">
-          <div class="bar-fill" style="width:${(monthly.investments / maxValue) * 100}%"></div>
-        </div>
-        <small class="subtle">${formatCurrency(monthly.investments)}</small>
-      </div>
-    `;
-  }
-
-  renderExpensePieChart(monthly);
-
-  const categories = buildCategoryReportFromMonth(data);
-  const categoryBars = document.getElementById("categoryBars");
-  const maxCategory = Math.max(...categories.map((item) => item.amount), 1);
-
-  if (categoryBars) {
-    categoryBars.innerHTML = categories.length
-      ? categories.map((item) => `
-        <div class="bar-row">
-          <div class="bar-row-head">
-            <strong>${escapeHtml(item.label)}</strong>
-            <span>${formatCurrency(item.amount)}</span>
-          </div>
-          <div class="bar-track">
-            <div class="bar-fill" style="width:${(item.amount / maxCategory) * 100}%"></div>
-          </div>
-        </div>
-      `).join("")
-      : emptyMessage("No hay egresos este mes.");
-  }
-
-  const summaryTable = document.getElementById("reportSummaryTable");
-  if (summaryTable) {
-    summaryTable.innerHTML = `
-      <tr><td>Ingresos del mes</td><td>${formatCurrency(monthly.income)}</td></tr>
-      <tr><td>Gastos operativos del mes</td><td>${formatCurrency(monthly.operational)}</td></tr>
-      <tr><td>Pagos a maestros del mes</td><td>${formatCurrency(monthly.teachers)}</td></tr>
-      <tr><td>Inversiones del mes</td><td>${formatCurrency(monthly.investments)}</td></tr>
-      <tr><td>Total de gastos del mes</td><td>${formatCurrency(monthly.totalExpenses)}</td></tr>
-      <tr><td>Balance del mes</td><td>${formatCurrency(monthly.balance)}</td></tr>
-      <tr><td>Total en caja</td><td>${formatCurrency(metrics.cajaTotal)}</td></tr>
-      <tr><td>Estudiantes activos</td><td>${studentStats.active}</td></tr>
-      <tr><td>Al día</td><td>${studentStats.onTime}</td></tr>
-      <tr><td>Pendientes</td><td>${studentStats.pending}</td></tr>
-      <tr><td>Retrasados</td><td>${studentStats.late}</td></tr>
-    `;
-  }
-
+  const startInput = document.getElementById("reportStartDate");
+  const endInput = document.getElementById("reportEndDate");
+  const applyButton = document.getElementById("applyReportDateBtn");
+  const currentMonthButton = document.getElementById("currentMonthReportBtn");
   const downloadButton = document.getElementById("downloadMonthlyReportBtn");
-  if (downloadButton) {
-    downloadButton.addEventListener("click", () => downloadCurrentMonthReport(data, studentStats));
+
+  const now = new Date();
+  const defaultStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const defaultEnd = todayValue();
+
+  if (startInput && !startInput.value) startInput.value = defaultStart;
+  if (endInput && !endInput.value) endInput.value = defaultEnd;
+
+  function renderSelectedPeriod() {
+    const startDate = startInput?.value || defaultStart;
+    const endDate = endInput?.value || defaultEnd;
+
+    if (!isValidDateRange(startDate, endDate)) {
+      toast("Selecciona un rango de fechas válido.");
+      return;
+    }
+
+    const metrics = computeMetrics(data);
+    const period = computePeriodBreakdown(data, startDate, endDate);
+    const studentStats = computeStudentStats(data);
+
+    setText("reportIncome", formatCurrency(period.income));
+    setText("reportExpenses", formatCurrency(period.totalExpenses));
+    setText("reportBalance", formatCurrency(period.balance));
+    setText("reportCaja", formatCurrency(metrics.cajaTotal));
+    setText("reportOperationalExpenses", formatCurrency(period.operational));
+    setText("reportTeacherExpenses", formatCurrency(period.teachers));
+    setText("reportInvestmentExpenses", formatCurrency(period.investments));
+    setText("reportNetFlow", formatCurrency(period.balance));
+
+    const comparison = document.getElementById("comparisonBars");
+    if (comparison) {
+      const maxValue = Math.max(period.income, period.operational, period.teachers, period.investments, period.totalExpenses, 1);
+      comparison.innerHTML = `
+        <div class="comparison-bar-card"><strong>Ingresos</strong><div class="bar-track"><div class="bar-fill" style="width:${(period.income / maxValue) * 100}%"></div></div><small class="subtle">${formatCurrency(period.income)}</small></div>
+        <div class="comparison-bar-card"><strong>Gastos operativos</strong><div class="bar-track"><div class="bar-fill" style="width:${(period.operational / maxValue) * 100}%"></div></div><small class="subtle">${formatCurrency(period.operational)}</small></div>
+        <div class="comparison-bar-card"><strong>Pagos a maestros</strong><div class="bar-track"><div class="bar-fill" style="width:${(period.teachers / maxValue) * 100}%"></div></div><small class="subtle">${formatCurrency(period.teachers)}</small></div>
+        <div class="comparison-bar-card"><strong>Inversiones</strong><div class="bar-track"><div class="bar-fill" style="width:${(period.investments / maxValue) * 100}%"></div></div><small class="subtle">${formatCurrency(period.investments)}</small></div>`;
+    }
+
+    renderExpensePieChart(period);
+
+    const categories = buildCategoryReportForPeriod(data, startDate, endDate);
+    const categoryBars = document.getElementById("categoryBars");
+    const maxCategory = Math.max(...categories.map((item) => item.amount), 1);
+    if (categoryBars) {
+      categoryBars.innerHTML = categories.length
+        ? categories.map((item) => `<div class="bar-row"><div class="bar-row-head"><strong>${escapeHtml(item.label)}</strong><span>${formatCurrency(item.amount)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(item.amount / maxCategory) * 100}%"></div></div></div>`).join("")
+        : emptyMessage("No hay egresos en el período seleccionado.");
+    }
+
+    const summaryTable = document.getElementById("reportSummaryTable");
+    if (summaryTable) {
+      summaryTable.innerHTML = `
+        <tr><td>Período</td><td>${formatDate(startDate)} - ${formatDate(endDate)}</td></tr>
+        <tr><td>Ingresos del período</td><td>${formatCurrency(period.income)}</td></tr>
+        <tr><td>Gastos operativos del período</td><td>${formatCurrency(period.operational)}</td></tr>
+        <tr><td>Pagos a maestros del período</td><td>${formatCurrency(period.teachers)}</td></tr>
+        <tr><td>Inversiones del período</td><td>${formatCurrency(period.investments)}</td></tr>
+        <tr><td>Total de gastos del período</td><td>${formatCurrency(period.totalExpenses)}</td></tr>
+        <tr><td>Balance del período</td><td>${formatCurrency(period.balance)}</td></tr>
+        <tr><td>Total en caja</td><td>${formatCurrency(metrics.cajaTotal)}</td></tr>
+        <tr><td>Estudiantes activos</td><td>${studentStats.active}</td></tr>
+        <tr><td>Al día</td><td>${studentStats.onTime}</td></tr>
+        <tr><td>Pendientes</td><td>${studentStats.pending}</td></tr>
+        <tr><td>Retrasados</td><td>${studentStats.late}</td></tr>`;
+    }
   }
+
+  applyButton?.addEventListener("click", renderSelectedPeriod);
+  currentMonthButton?.addEventListener("click", () => {
+    if (startInput) startInput.value = defaultStart;
+    if (endInput) endInput.value = defaultEnd;
+    renderSelectedPeriod();
+  });
+  downloadButton?.addEventListener("click", () => {
+    const startDate = startInput?.value || defaultStart;
+    const endDate = endInput?.value || defaultEnd;
+    if (!isValidDateRange(startDate, endDate)) {
+      toast("Selecciona un rango de fechas válido.");
+      return;
+    }
+    downloadPeriodReport(data, computeStudentStats(data), startDate, endDate);
+  });
+
+  renderSelectedPeriod();
 }
 
 function renderExpensePieChart(monthly) {
@@ -3222,6 +3218,30 @@ function renderExpensePieChart(monthly) {
       <small>${total > 0 ? ((item.value / total) * 100).toFixed(1) : 0}% del total de egresos</small>
     </div>
   `).join("");
+}
+
+function isDateInRange(dateString, startDate, endDate) {
+  if (!dateString || !startDate || !endDate) return false;
+  const value = String(dateString).slice(0, 10);
+  return value >= startDate && value <= endDate;
+}
+
+function isValidDateRange(startDate, endDate) {
+  return Boolean(startDate && endDate && startDate <= endDate);
+}
+
+function computePeriodBreakdown(data, startDate, endDate) {
+  const total = (list) => list
+    .filter((item) => isDateInRange(item.date, startDate, endDate))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const income = total(data.incomes);
+  const operational = total(data.expenses);
+  const teachers = total(data.teacherPayments);
+  const investments = total(data.investments);
+  const totalExpenses = operational + teachers + investments;
+
+  return { income, operational, teachers, investments, totalExpenses, balance: income - totalExpenses };
 }
 
 function computeMonthlyBreakdown(data) {
@@ -3431,6 +3451,20 @@ function buildRecentMovementsWithRunningBalance(data) {
   return withBalance.reverse();
 }
 
+function buildCategoryReportForPeriod(data, startDate, endDate) {
+  const map = {};
+  data.expenses.filter((item) => isDateInRange(item.date, startDate, endDate))
+    .forEach((item) => addToMap(map, `Gasto: ${capitalize(item.category)}`, item.amount));
+  data.investments.filter((item) => isDateInRange(item.date, startDate, endDate))
+    .forEach((item) => addToMap(map, `Inversión: ${capitalize(item.category)}`, item.amount));
+  const teacherTotal = data.teacherPayments
+    .filter((item) => isDateInRange(item.date, startDate, endDate))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  addToMap(map, "Pagos a maestros", teacherTotal);
+  return Object.entries(map).filter(([, amount]) => amount > 0)
+    .map(([label, amount]) => ({ label, amount })).sort((a, b) => b.amount - a.amount);
+}
+
 function buildCategoryReportFromMonth(data) {
   const month = currentMonth();
   const year = currentYear();
@@ -3510,29 +3544,25 @@ function buildDueDate(dueDay) {
   return new Date(year, month, safeDay, 23, 59, 59);
 }
 
-function downloadCurrentMonthReport(data, studentStats) {
-  const month = currentMonth();
-  const year = currentYear();
-  const monthLabel = new Date(year, month, 1).toLocaleDateString("es-MX", {
-    month: "long",
-    year: "numeric"
-  });
-
-  const incomes = data.incomes.filter((item) => isSameMonth(item.date, month, year));
-  const expenses = data.expenses.filter((item) => isSameMonth(item.date, month, year));
-  const teachers = data.teacherPayments.filter((item) => isSameMonth(item.date, month, year));
-  const investments = data.investments.filter((item) => isSameMonth(item.date, month, year));
+function downloadPeriodReport(data, studentStats, startDate, endDate) {
+  const incomes = data.incomes.filter((item) => isDateInRange(item.date, startDate, endDate));
+  const expenses = data.expenses.filter((item) => isDateInRange(item.date, startDate, endDate));
+  const teachers = data.teacherPayments.filter((item) => isDateInRange(item.date, startDate, endDate));
+  const investments = data.investments.filter((item) => isDateInRange(item.date, startDate, endDate));
   const enrollments = data.students.filter((item) => {
     const referenceDate = item.enrollmentDate || item.paymentDate || "";
-    return referenceDate && isSameMonth(referenceDate, month, year);
+    return isDateInRange(referenceDate, startDate, endDate);
   });
+  const period = computePeriodBreakdown(data, startDate, endDate);
 
   const rows = [
-    ["Reporte mensual", monthLabel],
-    ["Ingresos del mes", sumBy(incomes, "amount")],
-    ["Gastos operativos del mes", sumBy(expenses, "amount")],
-    ["Pagos a maestros del mes", sumBy(teachers, "amount")],
-    ["Inversiones del mes", sumBy(investments, "amount")],
+    ["Reporte financiero", `${startDate} a ${endDate}`],
+    ["Ingresos del período", period.income],
+    ["Gastos operativos del período", period.operational],
+    ["Pagos a maestros del período", period.teachers],
+    ["Inversiones del período", period.investments],
+    ["Total egresos", period.totalExpenses],
+    ["Balance del período", period.balance],
     ["Estudiantes activos", studentStats.active],
     ["Al día", studentStats.onTime],
     ["Pendientes", studentStats.pending],
@@ -3540,86 +3570,38 @@ function downloadCurrentMonthReport(data, studentStats) {
     [],
     ["Matriculas"],
     ["Fecha matrícula", "Fecha pago", "Estudiante", "Nivel", "Docente", "Tipo", "Mensualidad USD", "Material C$", "Due date"],
-    ...enrollments.map((item) => [
-      item.enrollmentDate || "",
-      item.paymentDate || "",
-      item.name || "",
-      item.level || "",
-      item.assignedTeacher || "",
-      item.studentType === "nino" ? "Niño" : "Adulto",
-      item.monthlyFee || 0,
-      item.materialFee || 0,
-      item.dueDay || ""
-    ]),
+    ...enrollments.map((item) => [item.enrollmentDate || "", item.paymentDate || "", item.name || "", item.level || "", item.assignedTeacher || "", item.studentType === "nino" ? "Niño" : "Adulto", item.monthlyFee || 0, item.materialFee || 0, item.dueDay || ""]),
     [],
     ["Ingresos"],
     ["Fecha", "Estudiante", "Nivel", "Concepto", "Categoría", "Método", "Moneda", "Monto original", "Tasa", "Monto USD", "Cuenta"],
-    ...incomes.map((item) => [
-      item.date,
-      item.student,
-      item.level,
-      item.concept,
-      item.category,
-      item.method,
-      item.currency || "USD",
-      item.originalAmount ?? item.amount,
-      item.exchangeRate || 1,
-      item.amount,
-      item.account
-    ]),
+    ...incomes.map((item) => [item.date, item.student, item.level, item.concept, item.category, item.method, item.currency || "USD", item.originalAmount ?? item.amount, item.exchangeRate || 1, item.amount, item.account]),
     [],
     ["Gastos"],
     ["Fecha", "Descripción", "Categoría", "Monto", "Cuenta", "Notas"],
-    ...expenses.map((item) => [
-      item.date,
-      item.description,
-      item.category,
-      item.amount,
-      item.account,
-      item.notes || ""
-    ]),
+    ...expenses.map((item) => [item.date, item.description, item.category, item.amount, item.account, item.notes || ""]),
     [],
     ["Pagos a maestros"],
     ["Fecha", "Maestro", "Subcategoría", "Descripción", "Moneda", "Monto original", "Tasa", "Monto USD", "Período", "Notas"],
-    ...teachers.map((item) => [
-      item.date,
-      item.teacher,
-      item.subcategory || "",
-      item.description || "",
-      item.currency || "USD",
-      item.originalAmount ?? item.amount,
-      item.exchangeRate || 1,
-      item.amount,
-      item.period,
-      item.notes || ""
-    ]),
+    ...teachers.map((item) => [item.date, item.teacher, item.subcategory || "", item.description || "", item.currency || "USD", item.originalAmount ?? item.amount, item.exchangeRate || 1, item.amount, item.period, item.notes || ""]),
     [],
     ["Inversiones"],
     ["Fecha", "Concepto", "Categoría", "Monto", "Cuenta", "Notas"],
-    ...investments.map((item) => [
-      item.date,
-      item.concept,
-      item.category,
-      item.amount,
-      item.account,
-      item.notes || ""
-    ])
+    ...investments.map((item) => [item.date, item.concept, item.category, item.amount, item.account, item.notes || ""])
   ];
 
   const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
-
   const link = document.createElement("a");
   link.href = url;
-  link.download = `reporte_mensual_${year}-${String(month + 1).padStart(2, "0")}.csv`;
+  link.download = `reporte_${sanitizeFileName(startDate)}_a_${sanitizeFileName(endDate)}.csv`;
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
-
-  toast("Reporte mensual descargado.");
+  toast("Reporte del período descargado.");
 }
+
 
 function updateSidebarCaja(data) {
   const metrics = computeMetrics(data);
