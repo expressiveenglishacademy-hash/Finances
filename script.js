@@ -139,7 +139,7 @@ function seedStorage() {
     expenseCategories: Array.isArray(parsed.expenseCategories) ? parsed.expenseCategories : base.expenseCategories,
     investmentCategories: Array.isArray(parsed.investmentCategories) ? parsed.investmentCategories : base.investmentCategories,
     accounts: Array.isArray(parsed.accounts) && parsed.accounts.length ? parsed.accounts : base.accounts,
-    students: Array.isArray(parsed.students) ? parsed.students : [],
+    students: normalizeStudents(Array.isArray(parsed.students) ? parsed.students : []),
     teachers: normalizeTeachers(Array.isArray(parsed.teachers) ? parsed.teachers : []),
     incomes: normalizeLegacyTimestamps(
       Array.isArray(parsed.incomes) ? parsed.incomes : [],
@@ -176,6 +176,21 @@ function seedStorage() {
   };
 
   saveData(merged);
+}
+
+function normalizeStudentStatus(status) {
+  const value = String(status || "Activo").trim();
+  if (value.toLowerCase() === "inactivo") return "Dropped Off";
+  if (value.toLowerCase() === "dropped off") return "Dropped Off";
+  return "Activo";
+}
+
+function normalizeStudents(list) {
+  return (Array.isArray(list) ? list : []).map((item) => ({
+    ...item,
+    status: normalizeStudentStatus(item.status),
+    droppedOffDate: item.droppedOffDate || ""
+  }));
 }
 
 function normalizeTeachers(list) {
@@ -500,12 +515,12 @@ async function upsertStudentToSupabase(student) {
 }
 
 async function deleteStudentFromSupabase(studentId) {
-  const { error } = await supabaseClient
-    .from("students")
-    .delete()
-    .eq("id", studentId);
-
-  if (error) throw error;
+  // Deprecated: students are never physically deleted from Finance.
+  const student = (await fetchStudentsFromSupabase()).find((item) => item.id === studentId);
+  if (!student) return;
+  student.status = "Dropped Off";
+  student.droppedOffDate = student.droppedOffDate || todayValue();
+  await upsertStudentToSupabase(student);
 }
 
 function mapStudentRowToApp(row) {
@@ -515,7 +530,7 @@ function mapStudentRowToApp(row) {
     level: row.level || "",
     monthlyFee: Number(row.monthly_fee || 0),
     dueDay: Number(row.due_day || 1),
-    status: row.status || "Activo",
+    status: normalizeStudentStatus(row.status),
     contact: row.contact || "",
     notes: row.notes || "",
     studentType: row.student_type || "adulto",
@@ -536,7 +551,7 @@ function mapStudentAppToRow(student) {
     level: student.level || "",
     monthly_fee: Number(student.monthlyFee || 0),
     due_day: Number(student.dueDay || 1),
-    status: student.status || "Activo",
+    status: normalizeStudentStatus(student.status),
     contact: student.contact || "",
     notes: student.notes || "",
     student_type: student.studentType || "adulto",
@@ -872,6 +887,8 @@ function renderDashboard(data) {
 }
 
 function renderStudentsPage(data) {
+  data.students = normalizeStudents(data.students);
+
   const form = document.getElementById("studentForm");
 
   if (form) {
@@ -884,9 +901,10 @@ function renderStudentsPage(data) {
         level: form.elements["level"].value.trim(),
         monthlyFee: Number(form.elements["monthlyFee"].value),
         dueDay: Number(form.elements["dueDay"].value),
-        status: form.elements["status"].value,
+        status: normalizeStudentStatus(form.elements["status"].value),
         contact: form.elements["contact"].value.trim(),
-        notes: form.elements["notes"].value.trim()
+        notes: form.elements["notes"].value.trim(),
+        droppedOffDate: ""
       };
 
       if (!payload.name || !payload.level || payload.monthlyFee <= 0 || payload.dueDay < 1 || payload.dueDay > 31) {
@@ -901,6 +919,10 @@ function renderStudentsPage(data) {
       if (exists) {
         toast("Ya existe un estudiante con ese nombre.");
         return;
+      }
+
+      if (payload.status === "Dropped Off") {
+        payload.droppedOffDate = todayValue();
       }
 
       data.students.unshift(payload);
@@ -920,11 +942,13 @@ function renderStudentsPage(data) {
   }
 
   const stats = computeStudentStats(data);
+  const droppedOffStudents = data.students.filter((student) => student.status === "Dropped Off");
 
   setText("studentsActiveCount", String(stats.active));
   setText("studentsOnTimeCount", String(stats.onTime));
   setText("studentsPendingCount", String(stats.pending));
   setText("studentsLateCount", String(stats.late));
+  setText("studentsDroppedOffCount", String(droppedOffStudents.length));
 
   const summaryCards = document.getElementById("studentsSummaryCards");
   if (summaryCards) {
@@ -933,11 +957,11 @@ function renderStudentsPage(data) {
         <div class="mini-stat-card">
           <span>${escapeHtml(student.name)}</span>
           <strong>${student.statusPayment}</strong>
-          <small>\u00DAltimo pago: ${student.lastPayment ? formatDate(student.lastPayment) : "Sin pago"}</small>
-          <small>Due date actual: d\u00EDa ${student.dueDay}</small>
+          <small>Último pago: ${student.lastPayment ? formatDate(student.lastPayment) : "Sin pago"}</small>
+          <small>Due date actual: día ${student.dueDay}</small>
         </div>
       `).join("")
-      : emptyMessage("A\u00FAn no hay estudiantes registrados.");
+      : emptyMessage("Aún no hay estudiantes activos.");
   }
 
   const tableBody = document.getElementById("studentsTableBody");
@@ -955,25 +979,111 @@ function renderStudentsPage(data) {
           <td>${student.statusPayment}</td>
           <td>${escapeHtml(student.status)}</td>
           <td>
-            <button class="btn btn-secondary btn-sm" data-edit-due-date="${student.id}">
-              Cambiar fecha
-            </button>
-            <button class="btn btn-secondary btn-sm" data-edit-student="${student.id}">
-              Editar
-            </button>
-            <button class="btn btn-secondary btn-sm" data-delete-student="${student.id}">
-              Borrar
-            </button>
+            <button class="btn btn-secondary btn-sm" data-edit-due-date="${student.id}">Cambiar fecha</button>
+            <button class="btn btn-secondary btn-sm" data-edit-student="${student.id}">Editar</button>
+            <button class="btn btn-secondary btn-sm" data-drop-student="${student.id}">Drop Off</button>
           </td>
         </tr>
       `).join("")
-      : `<tr><td colspan="10">No hay estudiantes registrados.</td></tr>`;
+      : `<tr><td colspan="10">No hay estudiantes activos.</td></tr>`;
   }
+
+  const droppedTableBody = document.getElementById("droppedOffTableBody");
+  if (droppedTableBody) {
+    droppedTableBody.innerHTML = droppedOffStudents.length
+      ? droppedOffStudents.map((student) => `
+        <tr>
+          <td>${escapeHtml(student.name)}</td>
+          <td>${escapeHtml(student.level)}</td>
+          <td>${formatCurrency(student.monthlyFee)}</td>
+          <td>${student.lastPayment ? formatDate(student.lastPayment) : "Sin pago"}</td>
+          <td>${student.droppedOffDate ? formatDate(student.droppedOffDate) : "—"}</td>
+          <td>${escapeHtml(student.contact || "—")}</td>
+          <td>
+            <button class="btn btn-secondary btn-sm" data-edit-student="${student.id}">Editar</button>
+            <button class="btn btn-primary btn-sm" data-reactivate-student="${student.id}">Reactivar</button>
+          </td>
+        </tr>
+      `).join("")
+      : `<tr><td colspan="7">No hay estudiantes en Dropped Off.</td></tr>`;
+  }
+
+  // Backward-compatible fallback if the HTML does not yet contain a dropped-off table.
+  const droppedSection = document.getElementById("droppedOffStudentsSection");
+  if (droppedSection) droppedSection.hidden = droppedOffStudents.length === 0;
 
   bindStudentDueDateButtons(data);
   bindEditStudentButtons(data);
-  bindDeleteStudentButtons(data);
+  bindDropStudentButtons(data);
+  bindReactivateStudentButtons(data);
 }
+
+function getStudentLastPayment(data, student) {
+  return data.incomes
+    .filter((income) => (income.student || "").toLowerCase() === (student.name || "").toLowerCase())
+    .sort((a, b) => new Date(b.date) - new Date(a.date))[0]?.date || null;
+}
+
+function bindDropStudentButtons(data) {
+  document.querySelectorAll("[data-drop-student]").forEach((button) => {
+    button.onclick = async () => {
+      const studentId = button.getAttribute("data-drop-student");
+      const student = data.students.find((item) => item.id === studentId);
+      if (!student) return;
+
+      const confirmed = window.confirm(
+        `¿Marcar a ${student.name} como Dropped Off?\n\nEl estudiante dejará de generar cobros y pendientes, pero sus datos y pagos históricos se conservarán.`
+      );
+      if (!confirmed) return;
+
+      student.status = "Dropped Off";
+      student.droppedOffDate = todayValue();
+      saveData(data);
+
+      try {
+        await upsertStudentToSupabase(student);
+      } catch (error) {
+        console.error(error);
+        toast("No se pudo actualizar el estudiante en la nube.");
+        return;
+      }
+
+      toast(`${student.name} ahora está en Dropped Off.`);
+      setTimeout(() => window.location.reload(), 300);
+    };
+  });
+}
+
+function bindReactivateStudentButtons(data) {
+  document.querySelectorAll("[data-reactivate-student]").forEach((button) => {
+    button.onclick = async () => {
+      const studentId = button.getAttribute("data-reactivate-student");
+      const student = data.students.find((item) => item.id === studentId);
+      if (!student) return;
+
+      const confirmed = window.confirm(
+        `¿Reactivar a ${student.name}?\n\nVolverá a aparecer como estudiante activo y podrá generar pendientes de mensualidad.`
+      );
+      if (!confirmed) return;
+
+      student.status = "Activo";
+      student.droppedOffDate = "";
+      saveData(data);
+
+      try {
+        await upsertStudentToSupabase(student);
+      } catch (error) {
+        console.error(error);
+        toast("No se pudo reactivar el estudiante en la nube.");
+        return;
+      }
+
+      toast(`${student.name} fue reactivado correctamente.`);
+      setTimeout(() => window.location.reload(), 300);
+    };
+  });
+}
+
 function bindStudentDueDateButtons(data) {
   document.querySelectorAll("[data-edit-due-date]").forEach((button) => {
     button.onclick = async () => {
@@ -1061,11 +1171,6 @@ function bindEditStudentButtons(data) {
         return;
       }
 
-      const newStatus = window.prompt("Editar estado (Activo o Inactivo):", student.status || "Activo");
-      if (newStatus === null) return;
-
-      const cleanStatus = newStatus.trim() || "Activo";
-
       const newContact = window.prompt("Editar contacto:", student.contact || "");
       if (newContact === null) return;
 
@@ -1078,7 +1183,7 @@ function bindEditStudentButtons(data) {
       student.level = newLevel.trim();
       student.monthlyFee = parsedMonthlyFee;
       student.dueDay = parsedDueDay;
-      student.status = cleanStatus;
+      // El estado se cambia mediante Drop Off / Reactivar.
       student.contact = newContact.trim();
       student.notes = newNotes.trim();
 
@@ -1107,35 +1212,36 @@ function bindEditStudentButtons(data) {
   });
 }
 function bindDeleteStudentButtons(data) {
+  // Legacy compatibility: old HTML buttons with data-delete-student now perform a soft drop-off.
   document.querySelectorAll("[data-delete-student]").forEach((button) => {
     button.onclick = async () => {
       const studentId = button.getAttribute("data-delete-student");
       const student = data.students.find((item) => item.id === studentId);
-
       if (!student) return;
 
       const confirmed = window.confirm(
-        `Se eliminar\u00E1 el estudiante ${student.name}. \u00BFDeseas continuar?`
+        `¿Marcar a ${student.name} como Dropped Off? Sus datos y pagos históricos se conservarán.`
       );
       if (!confirmed) return;
-      if (!confirmDelete()) return;
 
-      data.students = data.students.filter((item) => item.id !== studentId);
+      student.status = "Dropped Off";
+      student.droppedOffDate = todayValue();
       saveData(data);
 
       try {
-        await deleteStudentFromSupabase(studentId);
+        await upsertStudentToSupabase(student);
       } catch (error) {
         console.error(error);
-        toast("No se pudo borrar en la nube.");
+        toast("No se pudo actualizar el estudiante en la nube.");
         return;
       }
 
-      toast("Estudiante eliminado correctamente.");
+      toast(`${student.name} ahora está en Dropped Off.`);
       setTimeout(() => window.location.reload(), 300);
     };
   });
 }
+
 function renderEnrollmentPage(data) {
   ensureTeacherCatalog(data);
 
@@ -1630,6 +1736,20 @@ function renderIncomesPage(data) {
       if (!payload.date || !payload.student || !payload.level || !payload.concept || payload.originalAmount <= 0) {
         toast("Completa correctamente todos los campos del ingreso.");
         return;
+      }
+
+      const matchedStudent = data.students.find(
+        (student) => (student.name || "").toLowerCase() === payload.student.toLowerCase()
+      );
+
+      if (matchedStudent && matchedStudent.status === "Dropped Off") {
+        toast("Este estudiante está en Dropped Off y no puede recibir una nueva mensualidad.");
+        return;
+      }
+
+      if (matchedStudent && matchedStudent.status === "Activo" && !payload.level) {
+        payload.level = matchedStudent.level || payload.level;
+        payload.receiptLevel = payload.level;
       }
 
       data.incomes.unshift(payload);
@@ -3172,7 +3292,7 @@ function computeMetrics(data) {
 }
 
 function computeStudentStats(data) {
-  const activeStudents = data.students.filter((student) => student.status === "Activo");
+  const activeStudents = data.students.filter((student) => normalizeStudentStatus(student.status) === "Activo");
 
   const details = activeStudents.map((student) => {
     const payments = data.incomes
@@ -3375,7 +3495,7 @@ function ensureStudentDatalist(students) {
   }
 
   datalist.innerHTML = students
-    .filter((student) => student.status === "Activo")
+    .filter((student) => normalizeStudentStatus(student.status) === "Activo")
     .map((student) => `<option value="${escapeHtml(student.name)}"></option>`)
     .join("");
 
