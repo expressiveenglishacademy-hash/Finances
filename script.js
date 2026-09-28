@@ -1,8 +1,3 @@
-/* =========================================================
-   EEA — RECORDATORIOS PERSONALIZADOS DE MENSUALIDAD
-   Pegar al FINAL del script.js actual
-   ========================================================= */
-
 function eeaMonthFromPayment(payment) {
   const match = String(payment.concept || "").match(
     /\[MES:(\d{4}-(?:0[1-9]|1[0-2]))\]/
