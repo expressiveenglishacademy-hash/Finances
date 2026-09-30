@@ -6,6 +6,7 @@
   <title>Ingresos | Expressive English Academy Finances</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body data-page="ingresos">
   <div class="app-shell">
     <aside class="sidebar">
@@ -31,7 +32,10 @@
 
       <div class="sidebar-footer glass-card">
         <span class="eyebrow">Consejo</span>
-        <p>Registra estudiante, nivel, moneda y cuenta destino para mantener una trazabilidad clara.</p>
+        <p>
+          Selecciona el tipo de pago. Para mensualidades,
+          indica el mes y año al que corresponde.
+        </p>
       </div>
     </aside>
 
@@ -41,10 +45,15 @@
           <span class="eyebrow">Control detallado</span>
           <h1>Ingresos</h1>
         </div>
+
         <div class="topbar-actions">
-          <span class="status-pill">Mensualidades activas</span>
-          <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
-          <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
+          <span class="status-pill">Registro de pagos</span>
+          <button class="btn btn-secondary" data-reset-demo>
+            Resetear datos
+          </button>
+          <button class="btn btn-secondary" data-logout>
+            Cerrar sesión
+          </button>
         </div>
       </header>
 
@@ -60,29 +69,93 @@
 
             <form id="incomeForm" class="form-grid">
               <label class="field">
-                <span>Fecha</span>
+                <span>Fecha en que recibiste el pago</span>
                 <input type="date" name="date" required />
               </label>
 
               <label class="field">
                 <span>Nombre del estudiante</span>
-                <input type="text" name="student" placeholder="José Esteban" required />
+                <input
+                  type="text"
+                  name="student"
+                  placeholder="José Esteban"
+                  required
+                />
               </label>
 
               <label class="field">
                 <span>Nivel</span>
-                <input type="text" name="level" placeholder="Intermedio B1" required />
+                <input
+                  type="text"
+                  name="level"
+                  placeholder="Intermedio B1"
+                  required
+                />
               </label>
 
               <label class="field">
+                <span>Tipo de pago</span>
+                <select name="paymentType" required>
+                  <option value="Mensualidad">
+                    Mensualidad
+                  </option>
+                  <option value="Pago extracurricular">
+                    Pago extracurricular
+                  </option>
+                  <option value="Pago de matrícula">
+                    Pago de matrícula
+                  </option>
+                  <option value="Pagos retrasados">
+                    Pagos retrasados
+                  </option>
+                </select>
+              </label>
+
+              <label class="field" id="paymentMonthField">
+                <span>Mes que se está pagando</span>
+                <select name="paymentMonth" required>
+                  <option value="01">Enero</option>
+                  <option value="02">Febrero</option>
+                  <option value="03">Marzo</option>
+                  <option value="04">Abril</option>
+                  <option value="05">Mayo</option>
+                  <option value="06">Junio</option>
+                  <option value="07">Julio</option>
+                  <option value="08">Agosto</option>
+                  <option value="09">Septiembre</option>
+                  <option value="10">Octubre</option>
+                  <option value="11">Noviembre</option>
+                  <option value="12">Diciembre</option>
+                </select>
+              </label>
+
+              <label class="field" id="paymentYearField">
+                <span>Año de la mensualidad</span>
+                <input
+                  type="number"
+                  name="paymentYear"
+                  min="2000"
+                  max="2100"
+                  required
+                />
+              </label>
+
+              <label class="field field-full">
                 <span>Concepto</span>
-                <input type="text" name="concept" placeholder="Mensualidad abril" required />
+                <input
+                  type="text"
+                  name="concept"
+                  placeholder="Descripción del pago"
+                  required
+                />
               </label>
 
-              <label class="field">
-                <span>Categoría</span>
-                <select name="category" id="incomeCategorySelect"></select>
-              </label>
+              <!-- Campo utilizado por el script principal -->
+              <select
+                name="category"
+                id="incomeCategorySelect"
+                hidden
+              ></select>
 
               <label class="field">
                 <span>Método de pago</span>
@@ -103,21 +176,36 @@
               </label>
 
               <label class="field">
-                <span>Monto</span>
-                <input type="number" step="0.01" min="0" name="amount" placeholder="0.00" required />
+                <span>Monto recibido</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  name="amount"
+                  placeholder="0.00"
+                  required
+                />
               </label>
 
               <label class="field">
                 <span>Cuenta destino</span>
-                <select name="account" id="incomeAccountSelect"></select>
+                <select
+                  name="account"
+                  id="incomeAccountSelect"
+                ></select>
               </label>
 
               <label class="field field-full">
                 <span>Notas</span>
-                <textarea name="notes" placeholder="Pago correspondiente al mes actual"></textarea>
+                <textarea
+                  name="notes"
+                  placeholder="Observaciones adicionales del pago"
+                ></textarea>
               </label>
 
-              <button type="submit" class="btn btn-primary">Guardar ingreso</button>
+              <button type="submit" class="btn btn-primary">
+                Guardar ingreso
+              </button>
             </form>
           </article>
 
@@ -134,12 +222,14 @@
                 <span>Ingresos registrados</span>
                 <strong id="incomeTotalCount">0</strong>
               </div>
+
               <div class="mini-stat-card">
                 <span>Total acumulado en USD</span>
                 <strong id="incomeTotalAmount">$0</strong>
               </div>
+
               <div class="mini-stat-card">
-                <span>&Uacute;ltimo registro</span>
+                <span>Último registro</span>
                 <strong id="incomeLastStudent">Sin datos</strong>
               </div>
             </div>
@@ -173,6 +263,7 @@
                   <th>Eliminar</th>
                 </tr>
               </thead>
+
               <tbody id="incomeTableBody"></tbody>
             </table>
           </div>
@@ -181,8 +272,134 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>`r`n  <script src="script.js"></script>
-  <script src="recordatorios.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="script.js"></script>
+
+  <script>
+    (() => {
+      const form = document.getElementById("incomeForm");
+      if (!form) return;
+
+      const type = form.elements.paymentType;
+      const month = form.elements.paymentMonth;
+      const year = form.elements.paymentYear;
+      const concept = form.elements.concept;
+
+      const monthNames = [
+        "Enero", "Febrero", "Marzo", "Abril",
+        "Mayo", "Junio", "Julio", "Agosto",
+        "Septiembre", "Octubre", "Noviembre", "Diciembre"
+      ];
+
+      const today = new Date();
+
+      month.value = String(
+        today.getMonth() + 1
+      ).padStart(2, "0");
+
+      year.value = today.getFullYear();
+
+      let lastAutomaticConcept = "";
+
+      function updateFields() {
+        const isMonthly =
+          type.value === "Mensualidad" ||
+          type.value === "Pagos retrasados";
+
+        document.getElementById(
+          "paymentMonthField"
+        ).hidden = !isMonthly;
+
+        document.getElementById(
+          "paymentYearField"
+        ).hidden = !isMonthly;
+
+        month.required = isMonthly;
+        year.required = isMonthly;
+
+        const automaticConcept = isMonthly
+          ? `Mensualidad ${monthNames[Number(month.value) - 1]} ${year.value}`
+          : type.value;
+
+        if (
+          !concept.value ||
+          concept.value === lastAutomaticConcept
+        ) {
+          concept.value = automaticConcept;
+        }
+
+        lastAutomaticConcept = automaticConcept;
+      }
+
+      [type, month, year].forEach((field) => {
+        field.addEventListener("change", updateFields);
+      });
+
+      updateFields();
+
+      // Prepara los datos antes de que script.js guarde el ingreso.
+      form.addEventListener(
+        "submit",
+        (event) => {
+          const isMonthly =
+            type.value === "Mensualidad" ||
+            type.value === "Pagos retrasados";
+
+          const selectedMonth =
+            `${year.value}-${month.value}`;
+
+          if (
+            isMonthly &&
+            !/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(
+              selectedMonth
+            )
+          ) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+
+            alert("Selecciona un mes y un año válidos.");
+            return;
+          }
+
+          // Los pagos atrasados siguen siendo mensualidades
+          // para el cálculo de saldos y recordatorios.
+          const categoryValue = isMonthly
+            ? "Mensualidad"
+            : type.value;
+
+          const category = form.elements.category;
+
+          if (
+            ![...category.options].some(
+              (option) => option.value === categoryValue
+            )
+          ) {
+            category.add(
+              new Option(categoryValue, categoryValue)
+            );
+          }
+
+          category.value = categoryValue;
+
+          concept.value = concept.value.replace(
+            /\s*\[MES:\d{4}-\d{2}\]/gi,
+            ""
+          );
+
+          if (isMonthly) {
+            concept.value += ` [MES:${selectedMonth}]`;
+          }
+
+          const notes = form.elements.notes;
+
+          notes.value = notes.value.replace(
+            /\s*\[TIPO:[^\]]*\]/g,
+            ""
+          ) + ` [TIPO:${type.value}]`;
+        },
+        true
+      );
+    })();
+  </script>
 </body>
 </html>
-
