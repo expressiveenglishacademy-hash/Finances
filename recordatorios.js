@@ -160,10 +160,15 @@
           0
         );
 
-      const pending = Math.max(
-        0,
-        feeCents - paidCents
-      ) / 100;
+   const exemptedCents = window.eeaExemptions.cents(
+  student.id,
+  key
+);
+
+const pending = Math.max(
+  0,
+  feeCents - paidCents - exemptedCents
+) / 100;
 
       if (pending > 0) {
         items.push({ month: key, pending });
@@ -301,7 +306,8 @@
       if (studentsResult.error) throw studentsResult.error;
       if (incomesResult.error) throw incomesResult.error;
 
-      const entries = (studentsResult.data || [])
+      await window.eeaExemptions.load()
+        ;const entries = (studentsResult.data || [])
         .filter((student) =>
           !["dropped off", "inactivo"].includes(
             String(student.status || "Activo").toLowerCase()
