@@ -3316,7 +3316,12 @@ function computeStudentStats(data) {
 
   const details = activeStudents.map((student) => {
     const payments = data.incomes
-      .filter((income) => income.student.toLowerCase() === student.name.toLowerCase())
+     .filter((income) =>
+  String(income.student || "").toLowerCase() ===
+    String(student.name || "").toLowerCase() &&
+  String(income.category || "Mensualidad").toLowerCase() ===
+    "mensualidad"
+)
       .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     const lastPayment = payments[0]?.date || null;
