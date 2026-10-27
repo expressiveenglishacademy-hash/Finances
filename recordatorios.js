@@ -17,9 +17,18 @@
     })[char]);
 
   const monthNames = [
-    "enero", "febrero", "marzo", "abril",
-    "mayo", "junio", "julio", "agosto",
-    "septiembre", "octubre", "noviembre", "diciembre"
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre"
   ];
 
   function monthOf(payment) {
@@ -43,11 +52,13 @@
 
     if (!match) return "";
 
-    const name = match[1] === "setiembre"
-      ? "septiembre"
-      : match[1];
+    const name =
+      match[1] === "setiembre"
+        ? "septiembre"
+        : match[1];
 
     const month = monthNames.indexOf(name) + 1;
+
     const paymentDate = String(payment.date || "");
     const paymentYear = Number(paymentDate.slice(0, 4));
     const paymentMonth = Number(paymentDate.slice(5, 7));
@@ -58,7 +69,8 @@
 
     if (!year || !paymentMonth || !month) return "";
 
-    // No adivinar entre un anticipo y una deuda del año anterior.
+    // Evita adivinar si se trata de un anticipo
+    // o de una deuda de un año anterior.
     if (!match[2] && month > paymentMonth) return "";
 
     return `${year}-${String(month).padStart(2, "0")}`;
@@ -81,7 +93,8 @@
       (payment) => !monthOf(payment)
     );
 
-    // Cuando falta la matrícula, usar el primer pago registrado.
+    // Si falta la fecha de matrícula,
+    // se utiliza la fecha del primer pago registrado.
     const firstPaymentDate = payments
       .map((payment) =>
         String(payment.date || "").slice(0, 10)
@@ -111,6 +124,7 @@
     }
 
     const [year, month] = start.split("-").map(Number);
+
     const feeCents = Math.round(
       Number(student.monthly_fee || 0) * 100
     );
@@ -134,6 +148,7 @@
     ) {
       const y = cursor.getFullYear();
       const m = cursor.getMonth();
+
       const lastDay = new Date(y, m + 1, 0).getDate();
 
       const dueDay = Math.min(
@@ -142,7 +157,12 @@
       );
 
       const dueDate = new Date(
-        y, m, dueDay, 23, 59, 59
+        y,
+        m,
+        dueDay,
+        23,
+        59,
+        59
       );
 
       if (today <= dueDate) continue;
@@ -160,18 +180,21 @@
           0
         );
 
-   const exemptedCents = window.eeaExemptions.cents(
-  student.id,
-  key
-);
+      const exemptedCents = window.eeaExemptions.cents(
+        student.id,
+        key
+      );
 
-const pending = Math.max(
-  0,
-  feeCents - paidCents - exemptedCents
-) / 100;
+      const pending = Math.max(
+        0,
+        feeCents - paidCents - exemptedCents
+      ) / 100;
 
       if (pending > 0) {
-        items.push({ month: key, pending });
+        items.push({
+          month: key,
+          pending
+        });
       }
     }
 
@@ -197,30 +220,62 @@ const pending = Math.max(
 
     if (!recipient) return "";
 
+    // La fecha límite se establece 7 días después
+    // de generar el mensaje.
     const deadline = new Date();
     deadline.setDate(deadline.getDate() + 7);
 
-    const deadlineText = new Intl.DateTimeFormat(
+    const dateFormatter = new Intl.DateTimeFormat(
       "es-NI",
       {
         day: "numeric",
         month: "long",
         year: "numeric"
       }
-    ).format(deadline);
+    );
+
+    const deadlineText = dateFormatter.format(deadline);
 
     const lines = balance.items.map(({ month, pending }) => {
       const [year, number] = month.split("-").map(Number);
 
       const label = new Intl.DateTimeFormat(
         "es-NI",
-        { month: "long", year: "numeric" }
+        {
+          month: "long",
+          year: "numeric"
+        }
       ).format(new Date(year, number - 1, 1));
 
+      const capitalizedLabel =
+        label[0].toUpperCase() + label.slice(1);
+
+      const registeredDay = Number(student.due_day);
+      let dueDateText = "No registrada";
+
+      if (
+        Number.isInteger(registeredDay) &&
+        registeredDay >= 1 &&
+        registeredDay <= 31
+      ) {
+        const lastDay = new Date(year, number, 0).getDate();
+
+        // Si el día no existe en ese mes, se utiliza
+        // el último día disponible del mes.
+        const dueDay = Math.min(registeredDay, lastDay);
+
+        const dueDate = new Date(
+          year,
+          number - 1,
+          dueDay
+        );
+
+        dueDateText = dateFormatter.format(dueDate);
+      }
+
       return (
-        label[0].toUpperCase() +
-        label.slice(1) +
-        `: ${money(pending)} pendiente`
+        `${capitalizedLabel}: ${money(pending)} pendiente\n` +
+        `Fecha de pago registrada: ${dueDateText}`
       );
     });
 
@@ -231,14 +286,25 @@ const pending = Math.max(
     return (
       `Hola, ${recipient.split(/\s+/)[0]}. ` +
       `Te saludamos de Expressive English Academy.\n\n` +
+
       `${introduction}\n\n` +
-      `${lines.join("\n")}\n` +
+
+      `${lines.join("\n\n")}\n\n` +
+
       `Total pendiente: ${money(balance.total)}\n\n` +
+
       `Te agradeceríamos ponerte al día a más tardar el ${deadlineText}. ` +
       `Si ya realizaste algún pago o necesitas coordinarlo, ` +
       `escríbenos para revisarlo contigo. Después de esa fecha ` +
       `tendríamos que pausar el ingreso a clases hasta regularizar ` +
-      `el saldo. Gracias por tu comprensión.`
+      `el saldo.\n\n` +
+
+      `Gracias por tu compromiso y comprensión. Tu pago nos permite ` +
+      `seguir creciendo y mejorando para brindar una mejor experiencia ` +
+      `de aprendizaje a nuestros estudiantes. 💙\n\n` +
+
+      `Este es un mensaje automático generado por la plataforma ` +
+      `administrativa de Expressive English Academy.`
     );
   }
 
@@ -252,6 +318,7 @@ const pending = Math.max(
     }
 
     const panel = document.createElement("section");
+
     panel.id = "eeaReminders";
     panel.className = "glass-card";
 
@@ -295,19 +362,28 @@ const pending = Math.max(
 
     try {
       if (typeof supabaseClient === "undefined") {
-        throw new Error("No se encontró la conexión del CRM.");
+        throw new Error(
+          "No se encontró la conexión del CRM."
+        );
       }
 
-      const [studentsResult, incomesResult] = await Promise.all([
-        supabaseClient.from("students").select("*"),
-        supabaseClient.from("incomes").select("*")
-      ]);
+      const [studentsResult, incomesResult] =
+        await Promise.all([
+          supabaseClient.from("students").select("*"),
+          supabaseClient.from("incomes").select("*")
+        ]);
 
-      if (studentsResult.error) throw studentsResult.error;
-      if (incomesResult.error) throw incomesResult.error;
+      if (studentsResult.error) {
+        throw studentsResult.error;
+      }
 
-      await window.eeaExemptions.load()
-        ;const entries = (studentsResult.data || [])
+      if (incomesResult.error) {
+        throw incomesResult.error;
+      }
+
+      await window.eeaExemptions.load();
+
+      const entries = (studentsResult.data || [])
         .filter((student) =>
           !["dropped off", "inactivo"].includes(
             String(student.status || "Activo").toLowerCase()
@@ -338,9 +414,11 @@ const pending = Math.max(
                   <small>
                     Revisar historial:
                     ${balance.unknown.length} pago(s) sin mes claro
-                    ${balance.missingDate
-                      ? "; falta fecha de matrícula y no hay pagos registrados"
-                      : ""}.
+                    ${
+                      balance.missingDate
+                        ? "; falta fecha de matrícula y no hay pagos registrados"
+                        : ""
+                    }.
                   </small>
                 `
                 : `
@@ -367,40 +445,57 @@ const pending = Math.max(
           </p>
         `;
 
-      rows.querySelectorAll("[data-eea-index]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const { student, balance } = entries[
-            Number(button.dataset.eeaIndex)
-          ];
+      rows
+        .querySelectorAll("[data-eea-index]")
+        .forEach((button) => {
+          button.addEventListener("click", () => {
+            const { student, balance } = entries[
+              Number(button.dataset.eeaIndex)
+            ];
 
-          const message = buildMessage(student, balance);
-
-          if (!message) {
-            alert(
-              `Falta el nombre del responsable de ${student.name}.`
+            const message = buildMessage(
+              student,
+              balance
             );
-            return;
-          }
 
-          panel.querySelector("#eeaReminderText").value = message;
-          panel.querySelector("#eeaReminderEditor").hidden = false;
+            if (!message) {
+              alert(
+                `Falta el nombre del responsable de ${student.name}.`
+              );
+              return;
+            }
+
+            panel.querySelector(
+              "#eeaReminderText"
+            ).value = message;
+
+            panel.querySelector(
+              "#eeaReminderEditor"
+            ).hidden = false;
+          });
         });
-      });
 
-      panel.querySelector("#eeaReminderCopy").addEventListener(
-        "click",
-        async () => {
-          const textarea = panel.querySelector("#eeaReminderText");
+      panel
+        .querySelector("#eeaReminderCopy")
+        .addEventListener("click", async () => {
+          const textarea = panel.querySelector(
+            "#eeaReminderText"
+          );
 
           try {
-            await navigator.clipboard.writeText(textarea.value);
+            await navigator.clipboard.writeText(
+              textarea.value
+            );
+
             alert("Mensaje copiado.");
           } catch (error) {
             textarea.select();
-            alert("Texto seleccionado. Cópialo manualmente.");
+
+            alert(
+              "Texto seleccionado. Cópialo manualmente."
+            );
           }
-        }
-      );
+        });
     } catch (error) {
       console.error("Recordatorios EEA:", error);
 
