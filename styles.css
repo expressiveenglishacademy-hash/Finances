@@ -168,7 +168,9 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .brand-block {
@@ -209,8 +211,9 @@ textarea {
   display: grid;
   align-content: start;
   gap: 6px;
-  overflow: auto;
-  padding-right: 2px;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .nav-label {
@@ -234,7 +237,6 @@ textarea {
 .nav-link:hover,
 .nav-link.active {
   color: var(--text);
-  transform: translateX(3px);
   background: linear-gradient(135deg, rgba(30, 79, 146, 0.22), rgba(255, 255, 255, 0.05));
   border-color: var(--line);
 }
