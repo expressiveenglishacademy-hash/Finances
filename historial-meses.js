@@ -240,6 +240,16 @@
         button.disabled = true;
         status.textContent = "Guardando...";
 
+        if (window.eeaVista) {
+          payment.concept = concept;
+          saveData(data, { skipRemote: true });
+          tbody.querySelectorAll("[data-month-cell]").forEach((cell) => cell.remove());
+          decorateRows();
+          dialog.remove();
+          toast("Mes guardado solo en la vista de ejemplo.");
+          return;
+        }
+
         try {
           const { data: updated, error } = await supabaseClient
             .from("incomes")

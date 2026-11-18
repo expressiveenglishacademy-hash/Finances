@@ -146,6 +146,11 @@
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
+    if (window.eeaVista) {
+      status.textContent = "La vista de ejemplo no guarda exoneraciones.";
+      return;
+    }
+
     if (form.elements.pin.value !== "8681") {
       status.textContent = "PIN incorrecto.";
       return;
@@ -211,13 +216,7 @@
     return new Promise((resolve) => {
       const dialog = document.createElement("dialog");
 
-      dialog.style.cssText = `
-        padding: 24px;
-        border-radius: 16px;
-        background: #102033;
-        color: white;
-        border: 1px solid #456;
-      `;
+      dialog.className = "eea-dialog";
 
       dialog.innerHTML = `
         <form class="form-grid">
@@ -313,6 +312,12 @@
   });
 
   document.addEventListener("DOMContentLoaded", async () => {
+    if (window.eeaVista) {
+      status.textContent = "La vista de ejemplo no consulta ni guarda exoneraciones.";
+      tbody.innerHTML = `<tr><td colspan="7">Vista de ejemplo.</td></tr>`;
+      return;
+    }
+
     try {
       await loadData();
       status.textContent = "";

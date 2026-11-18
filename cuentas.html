@@ -18,18 +18,29 @@
       </a>
 
       <nav class="sidebar-nav">
-        <a href="index.html" class="nav-link">Inicio / Dashboard</a>
+        <p class="nav-label">Resumen</p>
+        <a href="index.html" class="nav-link">Inicio</a>
+        <a href="por-retirar.html" class="nav-link">Por retirar</a>
+        <a href="recordatorios.html" class="nav-link">Recordatorios</a>
+        <a href="calidad.html" class="nav-link">Avisos</a>
+        <p class="nav-label">Academia</p>
+        <a href="estudiantes.html" class="nav-link">Estudiantes</a>
+        <a href="matricula.html" class="nav-link">Matrícula</a>
+        <a href="historial-pagos.html" class="nav-link">Historial de pagos</a>
+        <p class="nav-label">Dinero</p>
         <a href="ingresos.html" class="nav-link">Ingresos</a>
         <a href="gastos.html" class="nav-link">Gastos</a>
-        <a href="cuentas.html" class="nav-link active">Cuentas</a>
+        <a href="cuentas.html" class="nav-link">Cuentas</a>
         <a href="maestros.html" class="nav-link">Pago de maestros</a>
         <a href="inversiones.html" class="nav-link">Inversiones</a>
         <a href="reportes.html" class="nav-link">Reportes</a>
+        <p class="nav-label">Sistema</p>
+        <a href="ajustes.html" class="nav-link">Ajustes</a>
       </nav>
 
       <div class="sidebar-footer glass-card">
         <span class="eyebrow">Resumen</span>
-        <strong id="accountsSidebarTotal">$0</strong>
+        <strong id="sidebarCaja">$0</strong>
         <p>Suma de todas las cuentas activas.</p>
       </div>
     </aside>
@@ -41,8 +52,6 @@
           <h1>Cuentas</h1>
         </div>
         <div class="topbar-actions">
-  <span class="status-pill">Modo oscuro activo</span>
-  <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
   <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
 </div>
 
@@ -141,7 +150,11 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>`r`n  <script src="script.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="finance-logic.js"></script>
+  <script src="script.js"></script>
+  <script src="por-retirar.js"></script>
+  <script src="calidad.js"></script>
 </body>
 </html>
 

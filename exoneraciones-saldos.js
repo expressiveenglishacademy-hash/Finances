@@ -2,52 +2,13 @@
 (() => {
   if (document.body.dataset.page !== "estudiantes") return;
 
-  let rows = [];
-  let request;
-  let ready = false;
-
-  window.eeaExemptions = {
-    async load() {
-      if (!request) {
-        request = (async () => {
-          const result = await supabaseClient
-            .from("payment_exemptions")
-            .select("student_id,period,amount,status")
-            .eq("status", "active");
-
-          if (result.error) throw result.error;
-
-          rows = result.data || [];
-          ready = true;
-          return rows;
-        })();
-      }
-
-      return request;
-    },
-
-    cents(studentId, period) {
-      return rows
-        .filter((row) =>
-          row.status === "active" &&
-          String(row.student_id) === String(studentId) &&
-          row.period === period
-        )
-        .reduce(
-          (sum, row) =>
-            sum + Math.max(
-              0,
-              Math.round(Number(row.amount || 0) * 100)
-            ),
-          0
-        );
-    }
-  };
-
   const originalStats = computeStudentStats;
 
   computeStudentStats = function (data) {
     const stats = originalStats(data);
+    if (!stats || stats.exemptionsApplied || !window.eeaExemptions?.ready) {
+      return stats;
+    }
     const now = new Date();
 
     const period =
@@ -55,12 +16,7 @@
       String(now.getMonth() + 1).padStart(2, "0");
 
     stats.details = stats.details.map((student) => {
-      if (!ready) {
-        return {
-          ...student,
-          statusPayment: "Revisar historial"
-        };
-      }
+      if (!window.eeaExemptions.ready) return student;
 
       const forgiven = window.eeaExemptions.cents(
         student.id,
@@ -134,8 +90,7 @@
       notice.setAttribute("role", "alert");
       notice.textContent =
         "No se pudieron consultar las exoneraciones. " +
-        "Los estados de pago requieren revisión; " +
-        "recarga la página.";
+        "Los saldos no restan becas ni excepciones hasta recargar.";
 
       document.querySelector("main")?.prepend(notice);
     }
