@@ -27,7 +27,12 @@ const {
   mergeTeacherRecords,
   teacherNamesToImport,
   enrollmentTeacherNames,
-  canonicalTeacherStatus
+  canonicalTeacherStatus,
+  canonicalStudentStatus,
+  isDroppedStudent,
+  isActiveStudent,
+  mergeStudentRecords,
+  keepDroppedStudentRows
 } = context;
 
 const today = "2026-11-18T12:00:00";
@@ -214,5 +219,115 @@ assert.equal(
   JSON.stringify(["Maestro Nuevo"])
 );
 assert.ok(enrollmentTeacherNames([irving, joseTeacher, karen], payments).includes("Irving Garcia"));
+
+assert.equal(canonicalStudentStatus("Inactivo"), "Dropped Off");
+assert.equal(canonicalStudentStatus(" RETIRADO "), "Dropped Off");
+assert.equal(canonicalStudentStatus("baja"), "Dropped Off");
+assert.equal(canonicalStudentStatus("dado de baja"), "Dropped Off");
+assert.equal(canonicalStudentStatus("Dropped Off"), "Dropped Off");
+assert.equal(canonicalStudentStatus("Activo"), "Activo");
+assert.equal(canonicalStudentStatus(""), "Activo");
+assert.equal(canonicalStudentStatus("baja temporal"), "baja temporal");
+
+const lateDropped = student({
+  id: "late-drop",
+  name: "Nora Díaz",
+  monthlyFee: 25,
+  dueDay: 1,
+  status: "Retirado"
+});
+const datedActive = student({
+  id: "dated",
+  name: "Olga Mora",
+  monthlyFee: 25,
+  dueDay: 1,
+  status: "Activo",
+  droppedOffDate: "2026-10-02"
+});
+const notedActive = student({
+  id: "noted",
+  name: "Ana Ruiz",
+  monthlyFee: 30,
+  dueDay: 1,
+  status: "Activo",
+  notes: "dado de baja en octubre, confirmar"
+});
+const dropStats = computeStudentStatsShared({
+  students: data.students.concat([lateDropped, datedActive, notedActive]),
+  incomes: data.incomes.concat([
+    { id: "p-nora", date: "2026-10-02", student: "Nora Díaz", category: "Mensualidad", concept: "Mensualidad octubre [MES:2026-10]", amount: 25 },
+    { id: "p-olga", date: "2026-10-02", student: "Olga Mora", category: "Mensualidad", concept: "Mensualidad octubre [MES:2026-10]", amount: 25 }
+  ])
+}, { today, exemptions: [] });
+assert.equal(dropStats.details.some((item) => item.id === "late-drop"), false);
+assert.equal(dropStats.details.some((item) => item.id === "dated"), false);
+assert.equal(dropStats.details.some((item) => item.id === "noted"), true);
+assert.equal(dropStats.active, 4);
+assert.equal(isDroppedStudent(lateDropped), true);
+assert.equal(isActiveStudent(notedActive), true);
+assert.equal(isDroppedStudent(notedActive), false);
+
+const remoteDropped = {
+  id: "s-drop",
+  name: "Nora Díaz",
+  status: "Dropped Off",
+  droppedOffDate: "2026-10-01",
+  contact: "111",
+  monthlyFee: 25
+};
+const staleActive = {
+  id: "s-drop",
+  name: "Nora Díaz",
+  status: "Activo",
+  droppedOffDate: "",
+  contact: "222",
+  monthlyFee: 30
+};
+const remoteSnapshot = JSON.stringify(remoteDropped);
+const staleSnapshot = JSON.stringify(staleActive);
+const kept = mergeStudentRecords([remoteDropped], [staleActive]);
+assert.equal(kept.length, 1);
+assert.equal(kept[0].status, "Dropped Off");
+assert.equal(kept[0].droppedOffDate, "2026-10-01");
+assert.equal(kept[0].contact, "222");
+assert.equal(kept[0].monthlyFee, 30);
+assert.equal(JSON.stringify(remoteDropped), remoteSnapshot);
+assert.equal(JSON.stringify(staleActive), staleSnapshot);
+
+const fromLocalDrop = mergeStudentRecords(
+  [{ id: "s-drop", name: "Nora Díaz", status: "Activo", contact: "111" }],
+  [{ id: "s-drop", name: "Nora Díaz", status: "Inactivo", droppedOffDate: "2026-09-01", contact: "111" }]
+);
+assert.equal(fromLocalDrop[0].status, "Dropped Off");
+assert.equal(fromLocalDrop[0].droppedOffDate, "2026-09-01");
+
+const stillActive = mergeStudentRecords(
+  [{ id: "s-live", name: "Luis", status: "Activo", contact: "old", monthlyFee: 25 }],
+  [{ id: "s-live", name: "Luis", status: "Activo", contact: "new", monthlyFee: 30 }]
+);
+assert.equal(stillActive.length, 1);
+assert.equal(stillActive[0].status, "Activo");
+assert.equal(stillActive[0].contact, "new");
+assert.equal(stillActive[0].droppedOffDate, "");
+
+const sameName = mergeStudentRecords(
+  [
+    { id: "s5", name: "Ana Ruiz", status: "Activo", notes: "dado de baja en octubre, confirmar" },
+    { id: "s6", name: "Ana Ruiz", status: "Dropped Off", droppedOffDate: "2026-10-01" }
+  ],
+  []
+);
+assert.equal(sameName.length, 2);
+assert.equal(sameName.find((item) => item.id === "s5").status, "Activo");
+assert.equal(sameName.find((item) => item.id === "s6").status, "Dropped Off");
+
+const healed = keepDroppedStudentRows(
+  [{ id: "s-drop", name: "Nora Díaz", status: "Activo", contact: "222", monthlyFee: 30 }],
+  kept
+);
+assert.equal(healed[0].status, "Dropped Off");
+assert.equal(healed[0].droppedOffDate, "2026-10-01");
+assert.equal(healed[0].contact, "222");
+assert.equal(healed[0].monthlyFee, 30);
 
 console.log("finance-logic tests passed");

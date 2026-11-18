@@ -78,10 +78,49 @@
     return "";
   }
 
+  function canonicalStudentStatus(status) {
+    const value = stripAccents(status)
+      .trim()
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/[.]+$/g, "");
+    if (!value || value === "activo" || value === "active") return "Activo";
+    const dropped = {
+      inactivo: true,
+      inactiva: true,
+      inactive: true,
+      "dropped off": true,
+      droppedoff: true,
+      dropped: true,
+      baja: true,
+      "dado de baja": true,
+      "de baja": true,
+      retirado: true,
+      retirada: true,
+      retiro: true
+    };
+    if (dropped[value]) return "Dropped Off";
+    // Leave an unknown label as written. The old helper turned every
+    // unknown label into Activo and the next sync stored that.
+    return String(status || "").trim();
+  }
+
+  function studentDropDate(student) {
+    return String(pick(student, ["droppedOffDate", "dropped_off_date"]) || "").trim();
+  }
+
+  function isDroppedStudent(student) {
+    if (!student || typeof student !== "object") return false;
+    if (studentDropDate(student)) return true;
+    return canonicalStudentStatus(student.status) !== "Activo";
+  }
+
+  function isActiveStudent(student) {
+    return !isDroppedStudent(student);
+  }
+
   function normalizeStatus(status) {
-    const value = String(status || "Activo").trim().toLowerCase();
-    if (value === "inactivo" || value === "dropped off") return "Dropped Off";
-    return "Activo";
+    return canonicalStudentStatus(status);
   }
 
   function exemptionCents(rows, studentId, period) {
@@ -109,7 +148,7 @@
     const students = Array.isArray(data.students) ? data.students : [];
     const incomes = Array.isArray(data.incomes) ? data.incomes : [];
 
-    const activeStudents = students.filter((student) => normalizeStatus(student.status) === "Activo");
+    const activeStudents = students.filter((student) => isActiveStudent(student));
 
     const details = activeStudents.map((student) => {
       const payments = incomes.filter((payment) =>
@@ -185,7 +224,7 @@
     const today = options.today ? new Date(options.today) : new Date();
     const students = Array.isArray(data.students) ? data.students : [];
     const incomes = Array.isArray(data.incomes) ? data.incomes : [];
-    const activeStudents = students.filter((student) => normalizeStatus(student.status) === "Activo");
+    const activeStudents = students.filter((student) => isActiveStudent(student));
 
     const details = activeStudents.map((student) => {
       const payments = incomes.filter((payment) =>
@@ -354,13 +393,13 @@
       byName.get(key).push(student);
     });
     byName.forEach((group) => {
-      const statuses = new Set(group.map((student) => normalizeStatus(student.status)));
+      const statuses = new Set(group.map((student) => isDroppedStudent(student) ? "Dropped Off" : "Activo"));
       if (statuses.has("Activo") && statuses.has("Dropped Off")) {
         mixed.push(`${group[0].name}: hay un registro activo y otro en Dropped Off`);
       }
     });
     students.forEach((student) => {
-      if (normalizeStatus(student.status) !== "Activo") return;
+      if (!isActiveStudent(student)) return;
       const droppedDate = pick(student, ["droppedOffDate", "dropped_off_date"]);
       const notes = stripAccents(student.notes);
       if (droppedDate) {
@@ -595,6 +634,78 @@
     };
   }
 
+  // A dropped student stays dropped when one copy is still marked active.
+  // Editable fields on the later copy still win. The inputs are not changed.
+  function copyStudent(item) {
+    const droppedOffDate = studentDropDate(item);
+    let status = canonicalStudentStatus(item.status);
+    if (droppedOffDate && status === "Activo") status = "Dropped Off";
+    return { ...item, status, droppedOffDate };
+  }
+
+  function mergeStudentRecords(remoteStudents, localStudents) {
+    const map = new Map();
+
+    function add(item) {
+      if (!item || typeof item !== "object") return;
+      const key = String(item.id || item.name || "").trim();
+      if (!key) return;
+      const current = map.get(key);
+      if (!current) {
+        map.set(key, copyStudent(item));
+        return;
+      }
+
+      const dropped = isDroppedStudent(current) || isDroppedStudent(item);
+      const combined = { ...current, ...item };
+      if (dropped) {
+        combined.status = "Dropped Off";
+        combined.droppedOffDate = studentDropDate(item) || studentDropDate(current);
+      } else {
+        combined.status = "Activo";
+        combined.droppedOffDate = "";
+      }
+      map.set(key, combined);
+    }
+
+    (Array.isArray(remoteStudents) ? remoteStudents : []).forEach(add);
+    (Array.isArray(localStudents) ? localStudents : []).forEach(add);
+    return Array.from(map.values());
+  }
+
+  // After a cloud read, put the dropped status and drop date back if the
+  // fetched row lost them. Does not remove students that came from the cloud.
+  function keepDroppedStudentRows(fetchedStudents, authorityStudents) {
+    const fetched = Array.isArray(fetchedStudents) ? fetchedStudents : [];
+    const authority = Array.isArray(authorityStudents) ? authorityStudents : [];
+    const byKey = new Map();
+    authority.forEach((student) => {
+      const key = String(student && (student.id || student.name) || "").trim();
+      if (key) byKey.set(key, student);
+    });
+
+    const seen = new Set();
+    const rows = fetched.map((student) => {
+      const key = String(student && (student.id || student.name) || "").trim();
+      if (key) seen.add(key);
+      const prior = byKey.get(key);
+      if (!prior || !isDroppedStudent(prior)) return student;
+      return {
+        ...student,
+        status: "Dropped Off",
+        droppedOffDate: studentDropDate(prior) || studentDropDate(student)
+      };
+    });
+
+    authority.forEach((student) => {
+      const key = String(student && (student.id || student.name) || "").trim();
+      if (!key || seen.has(key) || !isDroppedStudent(student)) return;
+      rows.push({ ...student, status: "Dropped Off", droppedOffDate: studentDropDate(student) });
+    });
+
+    return rows;
+  }
+
   // Archived wins over an active copy of the same person, including a copy
   // recreated from old payments with a new id. Active teachers still merge by id.
   function mergeTeacherRecords(remoteTeachers, localTeachers) {
@@ -729,6 +840,11 @@
   root.digitsPhone = digitsPhone;
   root.buildVistaData = buildVistaData;
   root.eeaNameKey = nameKey;
+  root.canonicalStudentStatus = canonicalStudentStatus;
+  root.isDroppedStudent = isDroppedStudent;
+  root.isActiveStudent = isActiveStudent;
+  root.mergeStudentRecords = mergeStudentRecords;
+  root.keepDroppedStudentRows = keepDroppedStudentRows;
   root.canonicalTeacherStatus = canonicalTeacherStatus;
   root.isArchivedTeacher = isArchivedTeacher;
   root.isActiveTeacher = isActiveTeacher;

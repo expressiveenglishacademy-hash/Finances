@@ -115,12 +115,11 @@
     if (studentsResult.error) throw studentsResult.error;
     if (exemptionsResult.error) throw exemptionsResult.error;
 
-    students = (studentsResult.data || []).filter(
-      (student) =>
-        !["inactivo", "dropped off"].includes(
-          String(student.status || "Activo").toLowerCase()
-        )
-    );
+    students = (studentsResult.data || []).filter((student) => {
+      if (typeof isDroppedStudent === "function") return !isDroppedStudent(student);
+      const status = String(student.status || "Activo").trim().toLowerCase();
+      return status !== "inactivo" && status !== "dropped off" && status !== "retirado" && status !== "baja";
+    });
 
     exemptions = exemptionsResult.data || [];
 
