@@ -448,7 +448,7 @@ function normalizeTeachers(list) {
     id: item.id || cryptoRandom(),
     name: item.name || "",
     contact: item.contact || "",
-    status: item.status || "Activo",
+    status: canonicalTeacherStatus(item.status),
     notes: item.notes || "",
     createdAt: item.createdAt || new Date().toISOString()
   }));
@@ -604,7 +604,7 @@ function mergeDataSets(remoteData, localData) {
       (item) => (item.name || "").trim().toLowerCase() || item.id
     ),
     students: mergeRecordsByKey(remoteData.students, localData.students, (item) => item.id || item.name),
-    teachers: mergeRecordsByKey(remoteData.teachers, localData.teachers, (item) => item.id || item.name),
+    teachers: mergeTeacherRecords(remoteData.teachers, localData.teachers),
     incomes: mergeRecordsByKey(remoteData.incomes, localData.incomes, (item) => item.id),
     expenses: mergeRecordsByKey(remoteData.expenses, localData.expenses, (item) => item.id),
     teacherPayments: mergeRecordsByKey(remoteData.teacherPayments, localData.teacherPayments, (item) => item.id),
@@ -843,7 +843,7 @@ function mapTeacherRowToApp(row) {
     id: row.id || cryptoRandom(),
     name: row.name || "",
     contact: row.contact || "",
-    status: row.status || "Activo",
+    status: canonicalTeacherStatus(row.status),
     notes: row.notes || "",
     createdAt: row.created_at || new Date().toISOString()
   };
@@ -854,10 +854,18 @@ function mapTeacherAppToRow(teacher) {
     id: teacher.id,
     name: teacher.name || "",
     contact: teacher.contact || "",
-    status: teacher.status || "Activo",
+    status: canonicalTeacherStatus(teacher.status),
     notes: teacher.notes || "",
     created_at: teacher.createdAt || new Date().toISOString()
   };
+}
+
+async function upsertTeacherToSupabase(teacher) {
+  const { error } = await supabaseClient
+    .from("teachers")
+    .upsert(mapTeacherAppToRow(teacher), { onConflict: "id" });
+
+  if (error) throw error;
 }
 
 function mapAccountRowToApp(row) {
@@ -1704,25 +1712,7 @@ function renderEnrollmentPage(data) {
 function fillEnrollmentTeacherSelect(select, data) {
   if (!select) return;
 
-  const teacherMap = new Map();
-
-  (data.teachers || []).forEach((teacher) => {
-    const name = (teacher.name || "").trim();
-    if (!name) return;
-    if ((teacher.status || "Activo") === "Activo") {
-      teacherMap.set(name.toLowerCase(), name);
-    }
-  });
-
-  (data.teacherPayments || []).forEach((payment) => {
-    const name = (payment.teacher || "").trim();
-    if (!name) return;
-    if (!teacherMap.has(name.toLowerCase())) {
-      teacherMap.set(name.toLowerCase(), name);
-    }
-  });
-
-  const teacherNames = Array.from(teacherMap.values()).sort((a, b) => a.localeCompare(b, "es"));
+  const teacherNames = enrollmentTeacherNames(data.teachers, data.teacherPayments);
 
   select.innerHTML = teacherNames.length
     ? `<option value="">Selecciona un docente</option>${teacherNames.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}`
@@ -2716,12 +2706,14 @@ function renderTeachersPage(data) {
         return;
       }
 
-      const exists = data.teachers.some(
-        (teacher) => teacher.name.toLowerCase() === payload.name.toLowerCase()
+      const existing = data.teachers.find(
+        (teacher) => eeaNameKey(teacher.name) === eeaNameKey(payload.name)
       );
 
-      if (exists) {
-        toast("Ya existe un maestro con ese nombre.");
+      if (existing) {
+        toast(isArchivedTeacher(existing)
+          ? "Ese maestro ya fue quitado y no vuelve a la lista."
+          : "Ya existe un maestro con ese nombre.");
         return;
       }
 
@@ -2832,6 +2824,11 @@ function renderTeacherSummary(data) {
   bindTeacherReceiptButtons(data);
 
   const summary = summarizeBy(data.teacherPayments, "teacher");
+  const archivedPaymentNames = new Set(
+    (data.teachers || [])
+      .filter((teacher) => isArchivedTeacher(teacher))
+      .map((teacher) => eeaNameKey(teacher.name))
+  );
   const summaryContainer = document.getElementById("teacherSummaryCards");
   if (summaryContainer) {
     const entries = Object.entries(summary);
@@ -2840,16 +2837,17 @@ function renderTeacherSummary(data) {
         <div class="mini-stat-card">
           <span>${escapeHtml(teacher)}</span>
           <strong>${formatCurrency(amount)}</strong>
-          <small>Total acumulado pagado</small>
+          <small>${archivedPaymentNames.has(eeaNameKey(teacher)) ? "Historial de pagos (maestro quitado)" : "Total acumulado pagado"}</small>
         </div>
       `).join("")
       : emptyMessage("Aún no hay pagos registrados.");
   }
 
+  const roster = visibleTeachers(data.teachers);
   const profilesTable = document.getElementById("teacherProfilesTableBody");
   if (profilesTable) {
-    profilesTable.innerHTML = data.teachers.length
-      ? data.teachers.map((teacher) => {
+    profilesTable.innerHTML = roster.length
+      ? roster.map((teacher) => {
         const payments = data.teacherPayments.filter(
           (item) => item.teacher.toLowerCase() === teacher.name.toLowerCase()
         );
@@ -2879,7 +2877,7 @@ function renderTeacherSummary(data) {
 
   const breakdownContainer = document.getElementById("teacherBreakdownCards");
   if (breakdownContainer) {
-    const teachersWithTotals = data.teachers.map((teacher) => {
+    const teachersWithTotals = roster.map((teacher) => {
       const payments = data.teacherPayments.filter(
         (item) => item.teacher.toLowerCase() === teacher.name.toLowerCase()
       );
@@ -3225,24 +3223,31 @@ function generateTeacherReceiptPDF(data, paymentId) {
 
 function bindDeleteTeacherButtons(data) {
   document.querySelectorAll("[data-delete-teacher]").forEach((button) => {
-    button.onclick = () => {
+    button.onclick = async () => {
       const teacherId = button.getAttribute("data-delete-teacher");
       const teacher = data.teachers.find((item) => item.id === teacherId);
-      if (!teacher) return;
+      if (!teacher || isArchivedTeacher(teacher)) return;
 
       const confirmed = window.confirm(
-        `Se eliminará el maestro ${teacher.name} y también todos sus pagos registrados. ¿Deseas continuar?`
+        `Se quitará a ${teacher.name} de los maestros activos. Los pagos ya registrados se quedan en el historial y en los reportes. ¿Deseas continuar?`
       );
       if (!confirmed) return;
       if (!confirmDelete()) return;
 
-      data.teachers = data.teachers.filter((item) => item.id !== teacherId);
-      data.teacherPayments = data.teacherPayments.filter(
-        (item) => item.teacher.toLowerCase() !== teacher.name.toLowerCase()
-      );
-
+      data.teachers = archiveTeacherById(data.teachers, teacherId);
       saveData(data);
-      toast("Maestro y pagos asociados eliminados correctamente.");
+
+      const archivedTeacher = data.teachers.find((item) => item.id === teacherId);
+      if (!window.eeaVista && archivedTeacher) {
+        try {
+          await upsertTeacherToSupabase(archivedTeacher);
+        } catch (error) {
+          console.error(error);
+          toast("Quedó quitada en este navegador. Se volverá a guardar en la nube al sincronizar.");
+        }
+      }
+
+      toast(`${teacher.name} ya no aparece entre los maestros activos. Sus pagos siguen en el historial.`);
       setTimeout(() => window.location.reload(), 300);
     };
   });
@@ -3253,38 +3258,27 @@ function ensureTeacherCatalog(data) {
     data.teachers = [];
   }
 
-  const namesFromPayments = Array.from(new Set(
-    data.teacherPayments
-      .map((item) => (item.teacher || "").trim())
-      .filter(Boolean)
-  ));
+  const names = teacherNamesToImport(data.teachers, data.teacherPayments);
+  if (!names.length) return;
 
-  let changed = false;
-
-  namesFromPayments.forEach((name) => {
-    const exists = data.teachers.some((teacher) => teacher.name.toLowerCase() === name.toLowerCase());
-    if (!exists) {
-      data.teachers.push({
-        id: cryptoRandom(),
-        name,
-        contact: "",
-        status: "Activo",
-        notes: "Importado desde pagos existentes",
-        createdAt: new Date().toISOString()
-      });
-      changed = true;
-    }
+  names.forEach((name) => {
+    data.teachers.push({
+      id: cryptoRandom(),
+      name,
+      contact: "",
+      status: "Activo",
+      notes: "Importado desde pagos existentes",
+      createdAt: new Date().toISOString()
+    });
   });
 
-  if (changed) {
-    saveData(data);
-  }
+  saveData(data);
 }
 
 function fillTeacherSelect(select, teachers) {
   if (!select) return;
 
-  const activeTeachers = teachers.filter((item) => item.status === "Activo");
+  const activeTeachers = (teachers || []).filter((item) => isActiveTeacher(item));
   select.innerHTML = activeTeachers.length
     ? activeTeachers.map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`).join("")
     : `<option value="">Primero registra un maestro</option>`;

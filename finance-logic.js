@@ -548,6 +548,137 @@
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
   }
 
+  function canonicalTeacherStatus(status) {
+    const value = stripAccents(status).trim();
+    if (!value || value === "activo") return "Activo";
+    if (value === "inactivo") return "Inactivo";
+    if (value === "archivado") return "Archivado";
+    return String(status || "").trim() || "Activo";
+  }
+
+  function isArchivedTeacher(teacher) {
+    return canonicalTeacherStatus(teacher && teacher.status) === "Archivado";
+  }
+
+  function isActiveTeacher(teacher) {
+    return canonicalTeacherStatus(teacher && teacher.status) === "Activo";
+  }
+
+  function visibleTeachers(teachers) {
+    return (Array.isArray(teachers) ? teachers : []).filter((teacher) => teacher && !isArchivedTeacher(teacher));
+  }
+
+  function archiveTeacherById(teachers, teacherId) {
+    const id = String(teacherId || "");
+    return (Array.isArray(teachers) ? teachers : []).map((teacher) => {
+      if (!teacher || String(teacher.id) !== id) return teacher;
+      return { ...teacher, status: "Archivado" };
+    });
+  }
+
+  function combineArchivedTeacher(current, item) {
+    if (!current) return { ...item };
+    const itemArchived = isArchivedTeacher(item);
+    const currentArchived = isArchivedTeacher(current);
+    if (!itemArchived && !currentArchived) return item;
+    const winner = itemArchived && !currentArchived ? item : currentArchived && !itemArchived ? current : item;
+    const loser = winner === item ? current : item;
+    return {
+      ...loser,
+      ...winner,
+      id: winner.id || loser.id,
+      name: String(winner.name || loser.name || "").trim(),
+      contact: winner.contact || loser.contact || "",
+      notes: winner.notes || loser.notes || "",
+      status: "Archivado",
+      createdAt: winner.createdAt || loser.createdAt || ""
+    };
+  }
+
+  // Archived wins over an active copy of the same person, including a copy
+  // recreated from old payments with a new id. Active teachers still merge by id.
+  function mergeTeacherRecords(remoteTeachers, localTeachers) {
+    const grouped = new Map();
+
+    function add(item) {
+      if (!item || typeof item !== "object") return;
+      const key = nameKey(item.name) || String(item.id || "");
+      if (!key) return;
+      const bucket = grouped.get(key);
+      if (bucket) bucket.push(item);
+      else grouped.set(key, [item]);
+    }
+
+    (Array.isArray(remoteTeachers) ? remoteTeachers : []).forEach(add);
+    (Array.isArray(localTeachers) ? localTeachers : []).forEach(add);
+
+    const merged = [];
+    grouped.forEach((bucket) => {
+      if (bucket.some(isArchivedTeacher)) {
+        let chosen = null;
+        bucket.forEach((item) => {
+          chosen = combineArchivedTeacher(chosen, item);
+        });
+        if (chosen) merged.push({ ...chosen, status: "Archivado" });
+        return;
+      }
+
+      const byId = new Map();
+      bucket.forEach((item) => {
+        const id = String(item.id || nameKey(item.name) || "");
+        if (!id) return;
+        byId.set(id, item);
+      });
+      byId.forEach((item) => merged.push(item));
+    });
+
+    return merged;
+  }
+
+  function teacherNamesToImport(teachers, payments) {
+    const known = new Set();
+    (Array.isArray(teachers) ? teachers : []).forEach((teacher) => {
+      const key = nameKey(teacher && teacher.name);
+      if (key) known.add(key);
+    });
+
+    const names = [];
+    (Array.isArray(payments) ? payments : []).forEach((payment) => {
+      const raw = String(payment && payment.teacher || "").trim().replace(/\s+/g, " ");
+      const key = nameKey(raw);
+      if (!key || known.has(key)) return;
+      known.add(key);
+      names.push(raw);
+    });
+    return names;
+  }
+
+  function enrollmentTeacherNames(teachers, payments) {
+    const archived = new Set();
+    const active = new Map();
+
+    (Array.isArray(teachers) ? teachers : []).forEach((teacher) => {
+      const name = String(teacher && teacher.name || "").trim();
+      const key = nameKey(name);
+      if (!key) return;
+      if (isArchivedTeacher(teacher)) {
+        archived.add(key);
+        active.delete(key);
+        return;
+      }
+      if (isActiveTeacher(teacher)) active.set(key, name);
+    });
+
+    (Array.isArray(payments) ? payments : []).forEach((payment) => {
+      const name = String(payment && payment.teacher || "").trim().replace(/\s+/g, " ");
+      const key = nameKey(name);
+      if (!key || archived.has(key) || active.has(key)) return;
+      active.set(key, name);
+    });
+
+    return Array.from(active.values()).sort((a, b) => a.localeCompare(b, "es"));
+  }
+
   function buildVistaData() {
     return {
       incomeCategories: ["Mensualidad"],
@@ -598,4 +729,12 @@
   root.digitsPhone = digitsPhone;
   root.buildVistaData = buildVistaData;
   root.eeaNameKey = nameKey;
+  root.canonicalTeacherStatus = canonicalTeacherStatus;
+  root.isArchivedTeacher = isArchivedTeacher;
+  root.isActiveTeacher = isActiveTeacher;
+  root.visibleTeachers = visibleTeachers;
+  root.archiveTeacherById = archiveTeacherById;
+  root.mergeTeacherRecords = mergeTeacherRecords;
+  root.teacherNamesToImport = teacherNamesToImport;
+  root.enrollmentTeacherNames = enrollmentTeacherNames;
 })(typeof window !== "undefined" ? window : globalThis);

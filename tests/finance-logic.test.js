@@ -19,7 +19,15 @@ const {
   buildReminderMessage,
   whatsappLink,
   digitsPhone,
-  buildVistaData
+  buildVistaData,
+  isArchivedTeacher,
+  isActiveTeacher,
+  visibleTeachers,
+  archiveTeacherById,
+  mergeTeacherRecords,
+  teacherNamesToImport,
+  enrollmentTeacherNames,
+  canonicalTeacherStatus
 } = context;
 
 const today = "2026-11-18T12:00:00";
@@ -140,5 +148,71 @@ assert.equal(link.includes("send=true"), false);
 const vista = buildVistaData();
 assert.ok(vista.students.length > 0);
 assert.ok(summarizeTransfers(vista.incomes, {}).mistakes.length >= 1);
+
+const fernanda = { id: "t-fer", name: "Fernanda Hernandez", status: "Activo", contact: "111", notes: "" };
+const irving = { id: "t-irv", name: "Irving Garcia", status: "Activo", contact: "222", notes: "" };
+const joseTeacher = { id: "t-jose", name: "Jose Andres Martinez", status: "Activo", contact: "", notes: "" };
+const karen = { id: "t-kar", name: "Karen Eligia Perez Delgado", status: "Activo", contact: "", notes: "" };
+const fernandaPayment = {
+  id: "pay-fer",
+  teacher: "Fernanda Hernandez",
+  amount: 80,
+  subcategory: "Horas laborales regulares"
+};
+const payments = [fernandaPayment];
+const paymentSnapshot = JSON.stringify(payments);
+
+let teachers = archiveTeacherById([fernanda, irving, joseTeacher, karen], fernanda.id);
+assert.equal(teachers.find((teacher) => teacher.id === "t-fer").status, "Archivado");
+assert.equal(fernanda.status, "Activo");
+assert.equal(JSON.stringify(payments), paymentSnapshot);
+
+const remoteStillActive = [
+  { ...fernanda, status: "Activo" },
+  { id: "t-reimport", name: "Fernanda Hernández", status: "Activo", notes: "Importado desde pagos existentes" },
+  irving,
+  joseTeacher,
+  karen
+];
+const merged = mergeTeacherRecords(remoteStillActive, teachers);
+const fernandas = merged.filter((teacher) => /fernanda/i.test(teacher.name));
+assert.equal(fernandas.length, 1);
+assert.equal(fernandas[0].status, "Archivado");
+assert.equal(fernandas[0].id, "t-fer");
+assert.equal(merged.filter((teacher) => !/fernanda/i.test(teacher.name)).length, 3);
+assert.equal(JSON.stringify([...teacherNamesToImport(merged, payments)]), "[]");
+assert.equal(enrollmentTeacherNames(merged, payments).some((name) => /fernanda/i.test(name)), false);
+assert.equal(visibleTeachers(merged).some((teacher) => /fernanda/i.test(teacher.name)), false);
+assert.equal(
+  JSON.stringify(visibleTeachers(merged).map((teacher) => teacher.name).sort()),
+  JSON.stringify(["Irving Garcia", "Jose Andres Martinez", "Karen Eligia Perez Delgado"])
+);
+assert.equal(JSON.stringify(payments), paymentSnapshot);
+
+const staleDevice = mergeTeacherRecords(
+  [{ ...fernanda, status: "Archivado" }, irving, joseTeacher, karen],
+  [fernanda, irving, joseTeacher, karen]
+);
+assert.equal(staleDevice.find((teacher) => teacher.id === "t-fer").status, "Archivado");
+assert.equal(staleDevice.length, 4);
+
+const contactEdit = mergeTeacherRecords(
+  [{ ...irving, contact: "" }],
+  [{ ...irving, contact: "555" }]
+);
+assert.equal(contactEdit.length, 1);
+assert.equal(contactEdit[0].contact, "555");
+assert.equal(contactEdit[0].status, "Activo");
+
+const inactive = { id: "t-sub", name: "Sustituto", status: "Inactivo" };
+assert.equal(isActiveTeacher(inactive), false);
+assert.equal(isArchivedTeacher(inactive), false);
+assert.equal(visibleTeachers([inactive, { ...fernanda, status: "Archivado" }]).length, 1);
+assert.equal(canonicalTeacherStatus(" archivado "), "Archivado");
+assert.equal(
+  JSON.stringify([...teacherNamesToImport([irving], [{ teacher: "Maestro Nuevo" }])]),
+  JSON.stringify(["Maestro Nuevo"])
+);
+assert.ok(enrollmentTeacherNames([irving, joseTeacher, karen], payments).includes("Irving Garcia"));
 
 console.log("finance-logic tests passed");
