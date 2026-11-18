@@ -3512,7 +3512,7 @@ function renderExpensePieChart(monthly) {
   });
 
   pie.style.background = `conic-gradient(${segments.join(", ")})`;
-  pie.style.boxShadow = "inset 0 0 0 18px #fffdf8, 0 12px 24px rgba(28,36,48,0.08)";
+  pie.style.boxShadow = "inset 0 0 0 18px rgba(7, 17, 31, 0.88), 0 18px 34px rgba(0,0,0,0.25)";
 
   legend.innerHTML = values.map((item) => `
     <div class="mini-stat-card">
