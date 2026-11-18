@@ -18,16 +18,24 @@
       </a>
 
  <nav class="sidebar-nav">
-        <a href="index.html" class="nav-link">Inicio / Dashboard</a>
+        <p class="nav-label">Resumen</p>
+        <a href="index.html" class="nav-link">Inicio</a>
+        <a href="por-retirar.html" class="nav-link">Por retirar</a>
+        <a href="recordatorios.html" class="nav-link">Recordatorios</a>
+        <a href="calidad.html" class="nav-link">Avisos</a>
+        <p class="nav-label">Academia</p>
         <a href="estudiantes.html" class="nav-link">Estudiantes</a>
-        <a href="matricula.html" class="nav-link active">Matrícula</a>
-        <a href="ingresos.html" class="nav-link">Ingresos</a>
+        <a href="matricula.html" class="nav-link">Matrícula</a>
         <a href="historial-pagos.html" class="nav-link">Historial de pagos</a>
+        <p class="nav-label">Dinero</p>
+        <a href="ingresos.html" class="nav-link">Ingresos</a>
         <a href="gastos.html" class="nav-link">Gastos</a>
         <a href="cuentas.html" class="nav-link">Cuentas</a>
         <a href="maestros.html" class="nav-link">Pago de maestros</a>
         <a href="inversiones.html" class="nav-link">Inversiones</a>
         <a href="reportes.html" class="nav-link">Reportes</a>
+        <p class="nav-label">Sistema</p>
+        <a href="ajustes.html" class="nav-link">Ajustes</a>
       </nav>
 
       <div class="sidebar-footer glass-card">
@@ -45,8 +53,6 @@
         </div>
 
         <div class="topbar-actions">
-          <span class="status-pill">Modo oscuro activo</span>
-          <button class="btn btn-secondary" data-reset-demo>Resetear datos</button>
           <button class="btn btn-secondary" data-logout>Cerrar sesión</button>
         </div>
       </header>
@@ -55,9 +61,9 @@
         <section class="hero-panel glass-card">
           <div>
             <span class="eyebrow">Vista principal</span>
-            <h2>Control diario con foco en caja, balance y actividad estudiantil</h2>
+            <h2>La caja, los pagos y lo que todavía falta retirar</h2>
             <p>
-              Supervisa ingresos, egresos, pagos pendientes y el flujo general de la academia.
+              Un vistazo del mes: cuánto entró, cuánto salió y qué transferencias siguen en la cuenta personal.
             </p>
           </div>
           <div class="hero-badge">
@@ -119,6 +125,33 @@
           </article>
         </section>
 
+        <section class="metrics-grid">
+          <article class="metric-card glass-card highlight-card">
+            <span class="eyebrow">Por retirar</span>
+            <h3 id="metricPorRetirar">…</h3>
+            <p id="metricPorRetirarDetail">Transferencias que siguen en la cuenta personal.</p>
+            <p id="metricTransferMistakes"></p>
+            <a class="text-link" href="por-retirar.html">Abrir detalle</a>
+          </article>
+
+          <article class="metric-card glass-card">
+            <span class="eyebrow">Avisos de datos</span>
+            <h3 id="metricWarnings">…</h3>
+            <p>Señales para revisar. No cambian ningún registro.</p>
+            <a class="text-link" href="calidad.html">Ver avisos</a>
+          </article>
+
+          <article class="glass-card chart-span" style="grid-column: span 2;">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Este mes</span>
+                <h2>Ingresos, egresos y pagos</h2>
+              </div>
+            </div>
+            <div id="dashboardCharts" class="stack-cards"></div>
+          </article>
+        </section>
+
         <section class="two-column">
           <article class="glass-card">
             <div class="panel-header">
@@ -129,7 +162,7 @@
               <a href="reportes.html" class="text-link">Ver reportes</a>
             </div>
 
-            <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 18px;">
+            <div class="metrics-grid metrics-3" style="margin-bottom: 18px;">
               <article class="mini-stat-card">
                 <span>Ingresos recientes</span>
                 <strong id="recentIncomeTotal">$0</strong>
@@ -171,7 +204,11 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>`r`n  <script src="script.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="finance-logic.js"></script>
+  <script src="script.js"></script>
+  <script src="por-retirar.js"></script>
+  <script src="calidad.js"></script>
 </body>
 </html>
 

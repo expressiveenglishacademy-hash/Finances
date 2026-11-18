@@ -6,39 +6,216 @@ const SUPABASE_URL = "https://iwxbxiwqpyyissjzyzcu.supabase.co";
 const SUPABASE_KEY = "sb_publishable_7sW_vVH2fBS_UPhlsNCANQ_bNhwMfCM";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+const PAGE_HREF = {
+  dashboard: "index.html",
+  estudiantes: "estudiantes.html",
+  matricula: "matricula.html",
+  ingresos: "ingresos.html",
+  historial: "historial-pagos.html",
+  gastos: "gastos.html",
+  cuentas: "cuentas.html",
+  maestros: "maestros.html",
+  inversiones: "inversiones.html",
+  reportes: "reportes.html",
+  porRetirar: "por-retirar.html",
+  recordatorios: "recordatorios.html",
+  calidad: "calidad.html",
+  ajustes: "ajustes.html"
+};
+
+function createExemptionsApi() {
+  let rows = [];
+  let request = null;
+  const api = {
+    ready: false,
+    async load() {
+      if (window.eeaVista) {
+        rows = [];
+        api.ready = true;
+        window.eeaExemptionRows = rows;
+        window.eeaExemptionsReady = true;
+        return rows;
+      }
+
+      if (!request) {
+        request = (async () => {
+          const result = await supabaseClient
+            .from("payment_exemptions")
+            .select("student_id,period,amount,status")
+            .eq("status", "active");
+
+          if (result.error) throw result.error;
+          rows = result.data || [];
+          api.ready = true;
+          window.eeaExemptionRows = rows;
+          window.eeaExemptionsReady = true;
+          return rows;
+        })().catch((error) => {
+          request = null;
+          api.ready = false;
+          window.eeaExemptionsReady = false;
+          window.eeaExemptionRows = [];
+          throw error;
+        });
+      }
+
+      return request;
+    },
+    cents(studentId, period) {
+      return rows
+        .filter((row) =>
+          String(row.status || "active") === "active" &&
+          String(row.student_id) === String(studentId) &&
+          row.period === period
+        )
+        .reduce((sum, row) => sum + Math.max(0, Math.round(Number(row.amount || 0) * 100)), 0);
+    }
+  };
+
+  return api;
+}
+
+window.eeaExemptions = window.eeaExemptions || createExemptionsApi();
+
 async function getAuthenticatedSession() {
   const { data, error } = await supabaseClient.auth.getSession();
   if (error) throw error;
   return data.session;
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
-  seedStorage();
+async function waitForSession() {
+  try {
+    const session = await getAuthenticatedSession();
+    if (session) return session;
+  } catch (error) {
+    console.error(error);
+  }
 
-  const page = document.body.dataset.page || "";
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (session) => {
+      if (settled) return;
+      settled = true;
+      resolve(session || null);
+    };
 
-  bindLogout();
-  bindResetButtons();
+    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || session) {
+        subscription.unsubscribe();
+        finish(session);
+      }
+    });
 
-  const session = await getAuthenticatedSession();
+    window.setTimeout(() => {
+      try { subscription.unsubscribe(); } catch (error) { /* already closed */ }
+      finish(null);
+    }, 1800);
+  });
+}
 
-  if (page === "login") {
-    if (session) {
-      window.location.href = "index.html";
-      return;
+function showBootBanner(text, isError) {
+  let banner = document.getElementById("bootBanner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "bootBanner";
+    banner.className = "boot-banner";
+    document.body.prepend(banner);
+  }
+  banner.textContent = text;
+  banner.hidden = false;
+  banner.classList.toggle("is-error", Boolean(isError));
+}
+
+function hideBootBanner() {
+  const banner = document.getElementById("bootBanner");
+  if (banner) banner.hidden = true;
+}
+
+function isolateVistaFromSupabase() {
+  const result = { data: [], error: null };
+  const builder = new Proxy(function () {}, {
+    get(_target, prop) {
+      if (prop === "then") {
+        return (resolve, reject) => Promise.resolve(result).then(resolve, reject);
+      }
+      return () => builder;
+    },
+    apply() {
+      return builder;
     }
+  });
+  supabaseClient.from = () => builder;
+}
 
-    initLogin();
-    return;
+function readVistaData() {
+  const key = "eea_vista_demo";
+  const saved = localStorage.getItem(key);
+  if (saved) {
+    try { return JSON.parse(saved); } catch (error) { /* use the sample */ }
   }
+  const data = typeof buildVistaData === "function" ? buildVistaData() : createEmptyData();
+  localStorage.setItem(key, JSON.stringify(data));
+  return data;
+}
 
-  if (!session) {
-    localStorage.removeItem(SESSION_KEY);
-    window.location.href = "login.html";
-    return;
-  }
+function ensureSidebarCaja() {
+  if (document.getElementById("sidebarCaja") || document.body.dataset.page === "login") return;
+  const footer = document.querySelector(".sidebar-footer");
+  if (!footer) return;
+  const label = document.createElement("span");
+  label.className = "eyebrow";
+  label.textContent = "Caja disponible";
+  const strong = document.createElement("strong");
+  strong.id = "sidebarCaja";
+  strong.textContent = "…";
+  footer.prepend(strong);
+  footer.prepend(label);
+}
 
-  const data = await getData();
+function setupChrome() {
+  ensureSidebarCaja();
+  document.querySelectorAll(".brand-block span").forEach((node) => {
+    node.textContent = "Embrace the Extraordinary";
+  });
+
+  const expected = PAGE_HREF[document.body.dataset.page || ""];
+  document.querySelectorAll(".nav-link").forEach((link) => {
+    link.classList.toggle("active", Boolean(expected) && link.getAttribute("href") === expected);
+  });
+
+  const sidebar = document.querySelector(".sidebar");
+  const topbar = document.querySelector(".topbar-actions");
+  if (!sidebar || !topbar || document.querySelector("[data-nav-toggle]")) return;
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "btn btn-secondary nav-toggle";
+  toggle.dataset.navToggle = "true";
+  toggle.setAttribute("aria-label", "Abrir menú");
+  toggle.textContent = "Menú";
+  topbar.prepend(toggle);
+
+  const backdrop = document.createElement("button");
+  backdrop.type = "button";
+  backdrop.className = "nav-backdrop";
+  backdrop.setAttribute("aria-label", "Cerrar menú");
+  document.body.appendChild(backdrop);
+
+  const close = () => {
+    sidebar.classList.remove("is-open");
+    document.body.classList.remove("nav-open");
+  };
+
+  toggle.addEventListener("click", () => {
+    const open = sidebar.classList.toggle("is-open");
+    document.body.classList.toggle("nav-open", open);
+  });
+  backdrop.addEventListener("click", close);
+  sidebar.querySelectorAll("a").forEach((link) => link.addEventListener("click", close));
+}
+
+function paintPage(page, data) {
+  window.__EEA_DATA__ = data;
   updateSidebarCaja(data);
 
   const handlers = {
@@ -51,10 +228,83 @@ document.addEventListener("DOMContentLoaded", async () => {
     cuentas: () => renderAccountsPage(data),
     maestros: () => renderTeachersPage(data),
     inversiones: () => renderInvestmentsPage(data),
-    reportes: () => renderReportsPage(data)
+    reportes: () => renderReportsPage(data),
+    porRetirar: () => typeof renderWithdrawalsPage === "function" && renderWithdrawalsPage(data),
+    recordatorios: () => typeof renderRemindersPage === "function" && renderRemindersPage(data),
+    calidad: () => typeof renderQualityPage === "function" && renderQualityPage(data),
+    ajustes: () => typeof renderSettingsPage === "function" && renderSettingsPage(data)
   };
 
   if (handlers[page]) handlers[page]();
+
+  if (page === "estudiantes" && typeof renderRemindersPage === "function") {
+    renderRemindersPage(data);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const page = document.body.dataset.page || "";
+  window.eeaVista = new URLSearchParams(window.location.search).get("vista") === "1";
+
+  if (!window.eeaVista) seedStorage();
+
+  bindLogout();
+  bindResetButtons();
+  setupChrome();
+
+  if (page === "login") {
+    if (window.eeaVista) return;
+    try {
+      const session = await waitForSession();
+      if (session) {
+        window.location.href = "index.html";
+        return;
+      }
+    } catch (error) {
+      console.error(error);
+    }
+    initLogin();
+    return;
+  }
+
+  if (window.eeaVista) {
+    isolateVistaFromSupabase();
+    document.body.classList.add("is-vista");
+    showBootBanner("Vista de ejemplo. No está conectada a tus datos ni escribe en Supabase.");
+    paintPage(page, readVistaData());
+    return;
+  }
+
+  showBootBanner("Cargando tus datos…");
+
+  try {
+    const session = await waitForSession();
+    if (!session) {
+      localStorage.removeItem(SESSION_KEY);
+      window.location.href = "login.html";
+      return;
+    }
+
+    try {
+      await window.eeaExemptions.load();
+    } catch (error) {
+      console.warn("Exoneraciones no disponibles:", error);
+      window.eeaExemptionsUnavailable = true;
+    }
+
+    const data = await getData();
+    paintPage(page, data);
+
+    if (window.eeaRemoteFailed && !hasBusinessData(data)) {
+      showBootBanner("No se pudo leer Supabase y este navegador no tiene una copia. Recarga la página.", true);
+      return;
+    }
+
+    hideBootBanner();
+  } catch (error) {
+    console.error(error);
+    showBootBanner("No se pudieron mostrar los datos. Recarga la página.", true);
+  }
 });
 
 const DEFAULT_ACCOUNTS = [
@@ -253,38 +503,61 @@ let remoteSyncReady = false;
 let remoteSyncTimer = null;
 let remoteSyncPromise = Promise.resolve();
 
+async function resolveRemoteData(localData) {
+  const remoteData = await fetchAllDataFromSupabase();
+  const localHasBusinessData = hasBusinessData(localData);
+  const remoteHasBusinessData = hasBusinessData(remoteData);
+  let workingData = remoteHasBusinessData ? remoteData : localData;
+
+  if (localHasBusinessData) {
+    const mergedData = mergeDataSets(remoteData, localData);
+    await syncFullDataToSupabase(mergedData);
+    workingData = await fetchAllDataFromSupabase();
+  } else if (remoteHasBusinessData) {
+    workingData = remoteData;
+  } else {
+    await syncFullDataToSupabase(localData);
+    workingData = await fetchAllDataFromSupabase();
+  }
+
+  return workingData;
+}
+
 async function getData() {
+  if (window.eeaVista) return readVistaData();
+
   const localData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || createEmptyData();
 
   try {
-    const remoteData = await fetchAllDataFromSupabase();
-    const localHasBusinessData = hasBusinessData(localData);
-    const remoteHasBusinessData = hasBusinessData(remoteData);
-
-    let workingData = remoteHasBusinessData ? remoteData : localData;
-
-    if (localHasBusinessData) {
-      const mergedData = mergeDataSets(remoteData, localData);
-      await syncFullDataToSupabase(mergedData);
-      workingData = await fetchAllDataFromSupabase();
-    } else if (remoteHasBusinessData) {
-      workingData = remoteData;
-    } else {
-      await syncFullDataToSupabase(localData);
-      workingData = await fetchAllDataFromSupabase();
-    }
-
+    const workingData = await resolveRemoteData(localData);
     remoteSyncReady = true;
+    window.eeaRemoteFailed = false;
     saveData(workingData, { skipRemote: true });
     return workingData;
   } catch (error) {
-    console.error("Supabase sync failed, using local fallback:", error);
-    remoteSyncReady = true;
-    return localData;
+    console.error("Supabase sync failed, retrying once:", error);
+    try {
+      await supabaseClient.auth.refreshSession();
+      const workingData = await resolveRemoteData(localData);
+      remoteSyncReady = true;
+      window.eeaRemoteFailed = false;
+      saveData(workingData, { skipRemote: true });
+      return workingData;
+    } catch (retryError) {
+      console.error("Supabase retry failed, using local fallback:", retryError);
+      remoteSyncReady = true;
+      window.eeaRemoteFailed = true;
+      return localData;
+    }
   }
 }
 
 function saveData(data, options = {}) {
+  if (window.eeaVista) {
+    localStorage.setItem("eea_vista_demo", JSON.stringify(data));
+    return;
+  }
+
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 
   if (!options.skipRemote && remoteSyncReady) {
@@ -781,6 +1054,25 @@ function bindLogout() {
 function bindResetButtons() {
   document.querySelectorAll("[data-reset-demo]").forEach((button) => {
     button.addEventListener("click", async () => {
+      if (window.eeaVista) {
+        toast("La vista de ejemplo no borra datos reales.");
+        return;
+      }
+
+      const phrase = document.getElementById("resetPhrase");
+      if (phrase) {
+        if (phrase.value.trim() !== "RESETEAR") {
+          toast("Escribe RESETEAR para continuar. No se borró nada.");
+          return;
+        }
+      } else {
+        const typed = window.prompt("Para continuar, escribe RESETEAR en mayúsculas.");
+        if (typed === null || typed.trim() !== "RESETEAR") {
+          toast("Confirmación incorrecta. No se borró nada.");
+          return;
+        }
+      }
+
       const confirmed = window.confirm("Se borrar\u00E1n todos los datos guardados. \u00BFDeseas continuar?");
       if (!confirmed) return;
 
@@ -878,11 +1170,25 @@ function renderDashboard(data) {
       ? alerts.map((student) => `
         <div class="mini-stat-card">
           <span>${escapeHtml(student.name)}</span>
-          <strong>${student.statusPayment}</strong>
+          <strong>${statusBadge(student.statusPayment)}</strong>
           <small>Saldo pendiente: ${formatCurrency(student.pendingAmount)}</small>
         </div>
       `).join("")
       : emptyMessage("No hay alumnos pendientes o retrasados.");
+  }
+
+  renderDashboardCharts(metrics, studentStats);
+
+  if (typeof collectQualityWarnings === "function") {
+    const warnings = collectQualityWarnings(data, {
+      exemptionsUnavailable: window.eeaExemptionsUnavailable === true
+    });
+    window.__EEA_WARNINGS__ = warnings;
+    setText("metricWarnings", String(warnings.length));
+  }
+
+  if (typeof renderDashboardInsights === "function") {
+    renderDashboardInsights(data);
   }
 }
 
@@ -976,8 +1282,8 @@ function renderStudentsPage(data) {
           <td>${formatDueDate(student.nextDueDate)}</td>
           <td>${formatCurrency(student.paidThisMonth)}</td>
           <td class="${student.pendingAmount > 0 ? "amount-negative" : "amount-positive"}">${formatCurrency(student.pendingAmount)}</td>
-          <td>${student.statusPayment}</td>
-          <td>${escapeHtml(student.status)}</td>
+          <td>${statusBadge(student.statusPayment)}</td>
+          <td>${statusBadge(student.status)}</td>
           <td>
             <button class="btn btn-secondary btn-sm" data-edit-due-date="${student.id}">Cambiar fecha</button>
             <button class="btn btn-secondary btn-sm" data-edit-student="${student.id}">Editar</button>
@@ -3206,7 +3512,7 @@ function renderExpensePieChart(monthly) {
   });
 
   pie.style.background = `conic-gradient(${segments.join(", ")})`;
-  pie.style.boxShadow = "inset 0 0 0 18px rgba(7, 17, 31, 0.88), 0 18px 34px rgba(0,0,0,0.25)";
+  pie.style.boxShadow = "inset 0 0 0 18px #fffdf8, 0 12px 24px rgba(28,36,48,0.08)";
 
   legend.innerHTML = values.map((item) => `
     <div class="mini-stat-card">
@@ -3312,6 +3618,13 @@ function computeMetrics(data) {
 }
 
 function computeStudentStats(data) {
+  if (typeof computeStudentStatsShared === "function") {
+    return computeStudentStatsShared(data);
+  }
+  return computeStudentStatsLegacy(data);
+}
+
+function computeStudentStatsLegacy(data) {
   const activeStudents = data.students.filter((student) => normalizeStudentStatus(student.status) === "Activo");
 
   const details = activeStudents.map((student) => {
@@ -3611,6 +3924,52 @@ function downloadPeriodReport(data, studentStats, startDate, endDate) {
 function updateSidebarCaja(data) {
   const metrics = computeMetrics(data);
   setText("sidebarCaja", formatCurrency(metrics.cajaTotal));
+}
+
+function statusBadge(status) {
+  const key = {
+    "Al día": "ok",
+    "Pendiente": "pending",
+    "Retrasado": "late",
+    "Revisar historial": "review",
+    "Activo": "ok",
+    "Dropped Off": "muted"
+  }[status] || "muted";
+  return `<span class="badge badge-${key}">${escapeHtml(status)}</span>`;
+}
+
+function renderDashboardCharts(metrics, studentStats) {
+  const host = document.getElementById("dashboardCharts");
+  if (!host) return;
+
+  const rows = [
+    { label: "Ingresos del mes", value: Number(metrics.incomesMonth || 0), className: "" },
+    { label: "Egresos del mes", value: Number(metrics.expensesMonth || 0), className: "bar-out" }
+  ];
+  const max = Math.max(...rows.map((row) => row.value), 1);
+
+  host.innerHTML = `
+    ${rows.map((row) => `
+      <div class="bar-row">
+        <div class="bar-row-head">
+          <strong>${row.label}</strong>
+          <span>${formatCurrency(row.value)}</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill ${row.className}" style="width:${Math.max(row.value > 0 ? 6 : 0, (row.value / max) * 100)}%"></div>
+        </div>
+      </div>
+    `).join("")}
+    <div class="mini-stat-card">
+      <span>Balance del mes</span>
+      <strong class="${metrics.balanceMonth >= 0 ? "amount-positive" : "amount-negative"}">${formatCurrency(metrics.balanceMonth)}</strong>
+    </div>
+    <div class="status-split">
+      ${statusBadge("Al día")} <span>${studentStats.onTime}</span>
+      ${statusBadge("Pendiente")} <span>${studentStats.pending}</span>
+      ${statusBadge("Retrasado")} <span>${studentStats.late}</span>
+    </div>
+  `;
 }
 
 function setText(id, value) {
