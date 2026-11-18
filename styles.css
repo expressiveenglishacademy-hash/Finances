@@ -778,7 +778,7 @@ textarea:focus {
   border: 1px solid rgba(122, 184, 255, 0.18);
   box-shadow: var(--shadow);
   color: var(--text);
-  z-index: 999;
+  z-index: 1100;
   max-width: min(360px, calc(100vw - 32px));
 }
 
