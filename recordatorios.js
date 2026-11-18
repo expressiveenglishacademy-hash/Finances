@@ -24,7 +24,9 @@
     const incomes = data.incomes || [];
     const exemptions = window.eeaExemptionsReady ? (window.eeaExemptionRows || []) : [];
     const entries = (data.students || [])
-      .filter((student) => normalizeStudentStatus(student.status) === "Activo")
+      .filter((student) => typeof isActiveStudent === "function"
+        ? isActiveStudent(student)
+        : normalizeStudentStatus(student.status) === "Activo")
       .map((student) => ({
         student,
         balance: balanceForStudent(student, incomes, { exemptions })

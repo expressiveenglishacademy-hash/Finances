@@ -151,9 +151,16 @@ function readVistaData() {
   const key = "eea_vista_demo";
   const saved = localStorage.getItem(key);
   if (saved) {
-    try { return JSON.parse(saved); } catch (error) { /* use the sample */ }
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed && Array.isArray(parsed.students)) {
+        parsed.students = normalizeStudents(parsed.students);
+      }
+      return parsed;
+    } catch (error) { /* use the sample */ }
   }
   const data = typeof buildVistaData === "function" ? buildVistaData() : createEmptyData();
+  data.students = normalizeStudents(data.students);
   localStorage.setItem(key, JSON.stringify(data));
   return data;
 }
@@ -429,18 +436,23 @@ function seedStorage() {
 }
 
 function normalizeStudentStatus(status) {
-  const value = String(status || "Activo").trim();
-  if (value.toLowerCase() === "inactivo") return "Dropped Off";
-  if (value.toLowerCase() === "dropped off") return "Dropped Off";
-  return "Activo";
+  if (typeof canonicalStudentStatus === "function") return canonicalStudentStatus(status);
+  const value = String(status || "Activo").trim().toLowerCase();
+  if (value === "inactivo" || value === "dropped off") return "Dropped Off";
+  return value ? String(status || "").trim() : "Activo";
 }
 
 function normalizeStudents(list) {
-  return (Array.isArray(list) ? list : []).map((item) => ({
-    ...item,
-    status: normalizeStudentStatus(item.status),
-    droppedOffDate: item.droppedOffDate || ""
-  }));
+  return (Array.isArray(list) ? list : []).map((item) => {
+    const droppedOffDate = String(item.droppedOffDate || item.dropped_off_date || "").trim();
+    let status = normalizeStudentStatus(item.status);
+    if (droppedOffDate && status === "Activo") status = "Dropped Off";
+    return {
+      ...item,
+      status,
+      droppedOffDate
+    };
+  });
 }
 
 function normalizeTeachers(list) {
@@ -511,8 +523,14 @@ async function resolveRemoteData(localData) {
 
   if (localHasBusinessData) {
     const mergedData = mergeDataSets(remoteData, localData);
-    await syncFullDataToSupabase(mergedData);
-    workingData = await fetchAllDataFromSupabase();
+    try {
+      await syncFullDataToSupabase(mergedData);
+      const fresh = await fetchAllDataFromSupabase();
+      workingData = keepDroppedStudents(fresh, mergedData);
+    } catch (error) {
+      console.error("Supabase sync kept the merged copy on this browser:", error);
+      workingData = mergedData;
+    }
   } else if (remoteHasBusinessData) {
     workingData = remoteData;
   } else {
@@ -603,7 +621,7 @@ function mergeDataSets(remoteData, localData) {
       localData.accounts,
       (item) => (item.name || "").trim().toLowerCase() || item.id
     ),
-    students: mergeRecordsByKey(remoteData.students, localData.students, (item) => item.id || item.name),
+    students: mergeStudentRecords(remoteData.students, localData.students),
     teachers: mergeTeacherRecords(remoteData.teachers, localData.teachers),
     incomes: mergeRecordsByKey(remoteData.incomes, localData.incomes, (item) => item.id),
     expenses: mergeRecordsByKey(remoteData.expenses, localData.expenses, (item) => item.id),
@@ -612,6 +630,14 @@ function mergeDataSets(remoteData, localData) {
   };
 
   return merged;
+}
+
+function keepDroppedStudents(fetched, authority) {
+  if (!fetched || typeof keepDroppedStudentRows !== "function") return fetched;
+  return {
+    ...fetched,
+    students: keepDroppedStudentRows(fetched.students, authority && authority.students)
+  };
 }
 
 function mergeUniqueStrings(first = [], second = []) {
@@ -687,7 +713,7 @@ async function fetchAllDataFromSupabase() {
 }
 
 async function syncFullDataToSupabase(data) {
-  await upsertRows("students", (data.students || []).map(mapStudentAppToRow));
+  await upsertStudentRows((data.students || []).map(mapStudentAppToRow));
   await upsertRows("teachers", normalizeTeachers(data.teachers || []).map(mapTeacherAppToRow));
   await upsertRows("accounts", (data.accounts || []).map(mapAccountAppToRow));
   await upsertRows("incomes", (data.incomes || []).map(mapIncomeAppToRow));
@@ -704,6 +730,42 @@ async function syncFullDataToSupabase(data) {
   await deleteMissingRows("investments", data.investments || []);
 
   await saveSettingsToSupabase(data);
+}
+
+let studentDropDateColumn = true;
+
+function missingDropDateColumn(error) {
+  const message = String(error && (error.message || error.details || error) || "");
+  return /dropped_off_date/i.test(message) && /column|schema cache/i.test(message);
+}
+
+function studentRowsForSync(rows) {
+  if (studentDropDateColumn) return rows;
+  return rows.map((row) => {
+    const copy = { ...row };
+    delete copy.dropped_off_date;
+    return copy;
+  });
+}
+
+async function upsertStudentRows(rows) {
+  if (!rows.length) return;
+
+  const payload = studentRowsForSync(rows);
+  const { error } = await supabaseClient
+    .from("students")
+    .upsert(payload, { onConflict: "id" });
+
+  if (error && studentDropDateColumn && missingDropDateColumn(error)) {
+    studentDropDateColumn = false;
+    const { error: retryError } = await supabaseClient
+      .from("students")
+      .upsert(studentRowsForSync(rows), { onConflict: "id" });
+    if (retryError) throw retryError;
+    return;
+  }
+
+  if (error) throw error;
 }
 
 async function upsertRows(table, rows) {
@@ -780,11 +842,7 @@ async function syncLocalStudentsToSupabase(students) {
 }
 
 async function upsertStudentToSupabase(student) {
-  const { error } = await supabaseClient
-    .from("students")
-    .upsert(mapStudentAppToRow(student), { onConflict: "id" });
-
-  if (error) throw error;
+  await upsertStudentRows([mapStudentAppToRow(student)]);
 }
 
 async function deleteStudentFromSupabase(studentId) {
@@ -797,13 +855,14 @@ async function deleteStudentFromSupabase(studentId) {
 }
 
 function mapStudentRowToApp(row) {
-  return {
+  return normalizeStudents([{
     id: row.id || cryptoRandom(),
     name: row.name || "",
     level: row.level || "",
     monthlyFee: Number(row.monthly_fee || 0),
     dueDay: Number(row.due_day || 1),
-    status: normalizeStudentStatus(row.status),
+    status: row.status,
+    droppedOffDate: row.dropped_off_date ? String(row.dropped_off_date).slice(0, 10) : "",
     contact: row.contact || "",
     notes: row.notes || "",
     studentType: row.student_type || "adulto",
@@ -814,18 +873,20 @@ function mapStudentRowToApp(row) {
     materialFee: Number(row.material_fee || 0),
     materialCurrency: row.material_currency || "NIO",
     enrollmentDate: row.enrollment_date || ""
-  };
+  }])[0];
 }
 
 function mapStudentAppToRow(student) {
+  const normalized = normalizeStudents([student])[0] || student;
   return {
-    id: student.id,
-    name: student.name || "",
-    level: student.level || "",
-    monthly_fee: Number(student.monthlyFee || 0),
-    due_day: Number(student.dueDay || 1),
-    status: normalizeStudentStatus(student.status),
-    contact: student.contact || "",
+    id: normalized.id,
+    name: normalized.name || "",
+    level: normalized.level || "",
+    monthly_fee: Number(normalized.monthlyFee || 0),
+    due_day: Number(normalized.dueDay || 1),
+    status: normalized.status,
+    dropped_off_date: normalized.droppedOffDate || null,
+    contact: normalized.contact || "",
     notes: student.notes || "",
     student_type: student.studentType || "adulto",
     mother_name: student.motherName || "",
@@ -1256,7 +1317,7 @@ function renderStudentsPage(data) {
   }
 
   const stats = computeStudentStats(data);
-  const droppedOffStudents = data.students.filter((student) => student.status === "Dropped Off");
+  const droppedOffStudents = data.students.filter((student) => isDroppedStudent(student));
 
   setText("studentsActiveCount", String(stats.active));
   setText("studentsOnTimeCount", String(stats.onTime));
@@ -2038,7 +2099,7 @@ function renderIncomesPage(data) {
         (student) => (student.name || "").toLowerCase() === payload.student.toLowerCase()
       );
 
-      if (matchedStudent && matchedStudent.status === "Dropped Off") {
+      if (matchedStudent && isDroppedStudent(matchedStudent)) {
         toast("Este estudiante está en Dropped Off y no puede recibir una nueva mensualidad.");
         return;
       }
@@ -3619,7 +3680,7 @@ function computeStudentStats(data) {
 }
 
 function computeStudentStatsLegacy(data) {
-  const activeStudents = data.students.filter((student) => normalizeStudentStatus(student.status) === "Activo");
+  const activeStudents = data.students.filter((student) => isActiveStudent(student));
 
   const details = activeStudents.map((student) => {
     const payments = data.incomes
@@ -3841,7 +3902,7 @@ function ensureStudentDatalist(students) {
   }
 
   datalist.innerHTML = students
-    .filter((student) => normalizeStudentStatus(student.status) === "Activo")
+    .filter((student) => isActiveStudent(student))
     .map((student) => `<option value="${escapeHtml(student.name)}"></option>`)
     .join("");
 
